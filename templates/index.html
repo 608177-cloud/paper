@@ -2,23 +2,22 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>日翊文化點交系統 - 全功能版</title>
+    <title>日翊文化點交系統 (全欄位)</title>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
     <style>
-        body { font-size: 10px; font-family: "Microsoft JhengHei", sans-serif; margin: 0; }
-        .no-print { background: #f8f9fa; padding: 20px; border-bottom: 2px solid #ddd; }
-        .form-section { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
-        .sig-canvas { border: 1px solid #000; background: #fff; width: 300px; height: 100px; }
+        body { font-size: 11px; font-family: "Microsoft JhengHei", "Heiti TC", sans-serif; margin: 0; padding: 10px; }
+        .no-print { background: #fdfdfd; padding: 15px; border-bottom: 2px solid #ccc; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .grid-input { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+        .grid-input input, .grid-input select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         
-        /* A4 列印設定：1張5格 */
-        .print-area { width: 210mm; margin: 0 auto; padding: 10mm 5mm; }
+        .print-area { width: 210mm; margin: 0 auto; padding: 5mm; }
         .record-box { 
-            width: 100%; height: 52mm; border: 1.5px solid black; margin-bottom: 2mm;
+            width: 100%; height: 53.4mm; border: 1.5px solid black; margin-bottom: 2mm;
             display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(8, 1fr);
             page-break-inside: avoid;
         }
-        .cell { border: 0.5px solid black; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1px; }
-        .bg-gray { background: #eeeeee; font-weight: bold; }
+        .cell { border: 0.5px solid #000; padding: 1px 3px; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .header-cell { background: #eeeeee; font-weight: bold; }
 
         @media print {
             .no-print { display: none !important; }
@@ -29,104 +28,93 @@
 <body>
 
 <div class="no-print">
-    <h2>🚚 點交資料輸入 (全欄位版)</h2>
-    <div style="margin-bottom: 15px;">
-        <label>📅 <b>選擇列印日期：</b></label>
-        <input type="date" id="dateSelect" value="{{ current_date }}">
-        <button onclick="location.href='/?date='+document.getElementById('dateSelect').value">切換日期</button>
-    </div>
-
-    <form action="/add" method="post" id="mainForm">
+    <h3>🚚 🚚 日翊文化點交錄入 (含紅箱/地墊/B2C全欄位) 🚚 🚚</h3>
+    <form action="/add" method="post" id="entryForm">
         <b>【基本資料】</b>
-        <div class="form-section">
-            <input type="text" name="route" placeholder="路線(如:大肚-大溪)" required>
-            <input type="text" name="trip" placeholder="車次">
-            <input type="text" name="car_no" placeholder="車號">
-            <select name="ton"><option>46噸</option><option>17噸</option></select>
+        <div class="grid-input">
+            <div>路線: <input type="text" name="route" required placeholder="大肚-大溪"></div>
+            <div>車次: <input type="text" name="trip" placeholder="第1車"></div>
+            <div>車號: <input type="text" name="car_no"></div>
+            <div>噸數: <select name="ton"><option>46噸</option><option>17噸</option></select></div>
         </div>
-
-        <b>【商品與數量】</b>
-        <div class="form-section">
-            <input type="number" name="red_box" placeholder="紅箱">
-            <input type="number" name="money_bag" placeholder="營收袋">
-            <input type="number" name="error_item" placeholder="異常件">
-            <input type="number" name="waste_ret" placeholder="廠退">
-            <input type="number" name="coffee" placeholder="咖啡豆">
-            <input type="number" name="shoes" placeholder="舊鞋救命">
-            <input type="number" name="important" placeholder="重要文件/商品">
-            <input type="number" name="o2o" placeholder="O2O商品">
-            <input type="number" name="pre_order" placeholder="預購">
-            <input type="number" name="inter_plant" placeholder="跨廠調撥">
-            <input type="number" name="lend_item" placeholder="借貸商品">
-            <input type="number" name="ret_item" placeholder="還貸商品">
-            <input type="number" name="b2c" placeholder="書籍退/B2C">
-            <input type="number" name="mat" placeholder="地墊/大小藍">
-        </div>
-
-        <b>【設備類】</b>
-        <div class="form-section">
-            <input type="number" name="cage" placeholder="空籠車">
-            <input type="number" name="basket" placeholder="空籃">
-            <input type="number" name="pallet" placeholder="棧板">
-            <input type="number" name="waterproof_blue" placeholder="藍白防水罩">
-            <input type="number" name="waterproof_cage" placeholder="籠車防水罩">
-        </div>
-
-        <b>【司機手寫簽名】(列印時會自動隱藏)</b><br>
-        <canvas id="sig-pad" class="sig-canvas"></canvas><br>
-        <button type="button" onclick="pad.clear()">清除</button>
-        <input type="hidden" name="signature" id="signature">
-        
         <hr>
-        <button type="submit" style="background: green; color: white; padding: 10px;">💾 儲存本日資料</button>
-        <button type="button" onclick="window.print()" style="background: red; color: white; padding: 10px;">🖨️ 列印 A4 表單</button>
+        <b>【商品與數量】(請填寫數量)</b>
+        <div class="grid-input">
+            <div>時效件: <input type="number" name="fast" value="0"></div>
+            <div>特殊件: <input type="number" name="special" value="0"></div>
+            <div>紅箱: <input type="number" name="red_box" value="0"></div>
+            <div>營收袋: <input type="number" name="money" value="0"></div>
+            <div>污衣/潔衣: <input type="number" name="dirty_clothes" value="0"></div>
+            <div>異常件: <input type="number" name="error" value="0"></div>
+            <div>廠退: <input type="number" name="waste" value="0"></div>
+            <div>舊鞋救命: <input type="number" name="shoes" value="0"></div>
+            <div>咖啡豆: <input type="number" name="coffee" value="0"></div>
+            <div>重要商品: <input type="number" name="important" value="0"></div>
+            <div>O2O商品: <input type="number" name="o2o" value="0"></div>
+            <div>預購: <input type="number" name="pre_order" value="0"></div>
+            <div>跨廠調撥: <input type="number" name="inter_plant" value="0"></div>
+            <div>地墊/大小藍: <input type="number" name="mat" value="0"></div>
+            <div>書籍退/B2C: <input type="number" name="b2c" value="0"></div>
+            <div>龍車防水罩: <input type="number" name="w_cage" value="0"></div>
+            <div>藍白防水罩: <input type="number" name="w_blue" value="0"></div>
+            <div>棧板(黑/綠/木): <input type="number" name="pallet" value="0"></div>
+            <div>空籃/落: <input type="number" name="basket" value="0"></div>
+            <div>空籠車: <input type="number" name="cage" value="0"></div>
+        </div>
+        <br>
+        <label>運務士手寫簽名：</label>
+        <div style="border:1px solid #ccc; width:300px; height:100px;"><canvas id="sig-pad" width="300" height="100"></canvas></div>
+        <input type="hidden" name="signature" id="signature">
+        <br>
+        <button type="submit" style="background: green; color: white; padding: 10px 20px;">💾 儲存資料</button>
+        <button type="button" onclick="window.print()" style="background: red; color: white; padding: 10px 20px;">🖨️ 列印 A4 (一頁5格)</button>
     </form>
 </div>
 
 <div class="print-area">
-    <h3 style="text-align: center;">日翊文化轉運車轉運商品點交表 (日期: {{ current_date }})</h3>
+    <h2 style="text-align:center;">日翊文化轉運車轉運商品點交表</h2>
     {% for r in records %}
     <div class="record-box">
-        <div class="cell bg-gray">配送起訖</div><div class="cell" style="grid-column: span 2;">{{ r.route }}</div>
-        <div class="cell bg-gray">車次</div><div class="cell">{{ r.trip }}</div>
-        <div class="cell bg-gray">車號</div><div class="cell">{{ r.car_no }}</div>
-        <div class="cell bg-gray">噸數</div><div class="cell">{{ r.ton }}</div>
-        <div class="cell bg-gray">進/出車時間</div><div class="cell" style="grid-column: span 2;">__:__ / __:__</div>
-        
-        <div class="cell bg-gray">紅箱</div><div class="cell">{{ r.red_box }}</div>
-        <div class="cell bg-gray">營收袋</div><div class="cell">{{ r.money_bag }}</div>
-        <div class="cell bg-gray">異常件</div><div class="cell">{{ r.error_item }}</div>
-        <div class="cell bg-gray">廠退</div><div class="cell">{{ r.waste_ret }}</div>
-        <div class="cell bg-gray">借貸</div><div class="cell">{{ r.lend_item }}</div>
-        <div class="cell bg-gray">還貸</div><div class="cell">{{ r.ret_item }}</div>
-        
-        <div class="cell bg-gray">舊鞋</div><div class="cell">{{ r.shoes }}</div>
-        <div class="cell bg-gray">咖啡豆</div><div class="cell">{{ r.coffee }}</div>
-        <div class="cell bg-gray">重要</div><div class="cell">{{ r.important }}</div>
-        <div class="cell bg-gray">預購</div><div class="cell">{{ r.pre_order }}</div>
-        <div class="cell bg-gray">O2O</div><div class="cell">{{ r.o2o }}</div>
-        <div class="cell bg-gray">調撥</div><div class="cell">{{ r.inter_plant }}</div>
-        
-        <div class="cell bg-gray">空籠</div><div class="cell">{{ r.cage }}</div>
-        <div class="cell bg-gray">空籃</div><div class="cell">{{ r.basket }}</div>
-        <div class="cell bg-gray">棧板</div><div class="cell">{{ r.pallet }}</div>
-        <div class="cell bg-gray">藍白罩</div><div class="cell">{{ r.waterproof_blue }}</div>
-        <div class="cell bg-gray">籠車罩</div><div class="cell">{{ r.waterproof_cage }}</div>
-        <div class="cell bg-gray">地墊</div><div class="cell">{{ r.mat }}</div>
+        <div class="cell header-cell">配送起訖</div><div class="cell" style="grid-column: span 2;">{{ r.route }}</div>
+        <div class="cell header-cell">車次</div><div class="cell">{{ r.trip }}</div>
+        <div class="cell header-cell">車號</div><div class="cell">{{ r.car_no }}</div>
+        <div class="cell header-cell">噸數</div><div class="cell">{{ r.ton }}</div>
+        <div class="cell header-cell" style="grid-column: span 2;">進/出車時間</div><div class="cell" style="grid-column: span 2;">__:__ / __:__</div>
 
-        <div class="cell bg-gray">書籍退</div><div class="cell">{{ r.b2c }}</div>
-        <div class="cell bg-gray" style="grid-column: span 2;">運務士簽章</div>
-        <div class="cell" style="grid-column: span 3; font-size: 8px;">(登錄時間: {{ r.timestamp }})</div>
-        <div class="cell" style="grid-column: span 5; background: #fafafa;">備註: </div>
+        <div class="cell header-cell">時效件</div><div class="cell">{{ r.fast }}</div>
+        <div class="cell header-cell">特殊件</div><div class="cell">{{ r.special }}</div>
+        <div class="cell header-cell">紅箱</div><div class="cell">{{ r.red_box }}</div>
+        <div class="cell header-cell">營收袋</div><div class="cell">{{ r.money }}</div>
+        <div class="cell header-cell">污衣/潔衣</div><div class="cell">{{ r.dirty_clothes }}</div>
+        <div class="cell header-cell">異常件</div><div class="cell">{{ r.error }}</div>
+        <div class="cell header-cell">廠退</div><div class="cell">{{ r.waste }}</div>
+
+        <div class="cell header-cell">舊鞋</div><div class="cell">{{ r.shoes }}</div>
+        <div class="cell header-cell">咖啡豆</div><div class="cell">{{ r.coffee }}</div>
+        <div class="cell header-cell">重要商品</div><div class="cell">{{ r.important }}</div>
+        <div class="cell header-cell">預購</div><div class="cell">{{ r.pre_order }}</div>
+        <div class="cell header-cell">O2O</div><div class="cell">{{ r.o2o }}</div>
+        <div class="cell header-cell">調撥</div><div class="cell">{{ r.inter_plant }}</div>
+
+        <div class="cell header-cell">籠車罩</div><div class="cell">{{ r.w_cage }}</div>
+        <div class="cell header-cell">藍白罩</div><div class="cell">{{ r.w_blue }}</div>
+        <div class="cell header-cell">棧板</div><div class="cell">{{ r.pallet }}</div>
+        <div class="cell header-cell">空籃</div><div class="cell">{{ r.basket }}</div>
+        <div class="cell header-cell">空籠</div><div class="cell">{{ r.cage }}</div>
+        <div class="cell header-cell">地墊</div><div class="cell">{{ r.mat }}</div>
+
+        <div class="cell header-cell">B2C</div><div class="cell">{{ r.b2c }}</div>
+        <div class="cell header-cell" style="grid-column: span 2;">運務士簽章</div><div class="cell" style="grid-column: span 6;"></div>
     </div>
     {% endfor %}
 </div>
 
 <script>
     const pad = new SignaturePad(document.getElementById('sig-pad'));
-    document.getElementById('mainForm').onsubmit = () => {
+    document.getElementById('entryForm').onsubmit = () => {
         if(!pad.isEmpty()) document.getElementById('signature').value = pad.toDataURL();
     };
 </script>
+
 </body>
 </html>
