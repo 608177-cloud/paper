@@ -2,11 +2,11 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>日翊文化轉運車點交系統 (完整版)</title>
+    <title>日翊文化轉運車點交系統 (完整簽名版)</title>
     <style>
         body { font-size: 11px; margin: 0; padding: 10px; font-family: "Microsoft JhengHei", Arial, sans-serif; }
         
-        /* 輸入介面樣式 */
+        /* 輸入介面樣式 (保持不變) */
         .no-print { background: #f9f9f9; padding: 15px; border-bottom: 2px solid #ccc; margin-bottom: 20px; border-radius: 8px; }
         .form-row { margin-bottom: 10px; padding: 5px; border-bottom: 1px solid #eee; }
         .form-group { margin: 5px; display: inline-block; vertical-align: top; }
@@ -14,20 +14,21 @@
         .no-print input[type="text"], .no-print select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
         .no-print input[type="number"] { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 50px; }
         
-        /* 列印區域樣式 */
+        /* 列印區域樣式 (微調格子排列) */
         .print-area { width: 210mm; margin: 0 auto; }
         .record-box { 
             width: 100%; height: 55mm; /* 設定高度讓 5 格剛好滿一頁 */
             border: 2px solid black; margin-bottom: 4px; 
             display: grid; 
             grid-template-columns: repeat(6, 1fr); 
-            grid-template-rows: repeat(7, 1fr);
+            grid-template-rows: repeat(7, 1fr); /* 保持 7 行 */
             page-break-inside: avoid;
         }
         .cell { border: 0.5px solid #000; padding: 1px; display: flex; align-items: center; justify-content: center; text-align: center; }
         .header { grid-column: span 6; background: #eee; font-weight: bold; font-size: 13px; border-bottom: 1px solid black; }
         .col-span-2 { grid-column: span 2; }
         .col-span-3 { grid-column: span 3; }
+        .signature-cell { grid-column: span 2; grid-row: span 2; background: #fdfdfd; font-size: 12px; font-weight: bold; border-left: 1.5px solid black; } /* 新增簽名欄位樣式 */
         
         /* A4 列印設定 */
         @media print {
@@ -41,7 +42,7 @@
 <body>
 
 <div class="no-print">
-    <h2>🚚 🚚 日翊文化點交資料輸入 (完整版) 🚚 🚚</h2>
+    <h2>🚚 🚚 日翊文化點交資料輸入 (完整簽名版) 🚚 🚚</h2>
     <form action="/add" method="post">
         
         <div class="form-row">
@@ -52,32 +53,28 @@
         </div>
 
         <div class="form-row">
-            <b>一般商品：</b><br>
+            <b>商品數量：</b><br>
             <div class="form-group"><label>紅箱(根)</label><input type="number" name="red_box" value="0"></div>
             <div class="form-group"><label>營收袋(箱/板)</label><input type="number" name="money_bag" value="0"></div>
             <div class="form-group"><label>異常件(板)</label><input type="number" name="error_item" value="0"></div>
             <div class="form-group"><label>廢退(箱)</label><input type="number" name="waste_ret" value="0"></div>
             <div class="form-group"><label>舊鞋救命(板)</label><input type="number" name="shoes" value="0"></div>
             <div class="form-group"><label>咖啡豆(台)</label><input type="number" name="coffee" value="0"></div>
-        </div>
-
-        <div class="form-row">
-            <b>公益/特殊：</b><br>
             <div class="form-group"><label>重要商品(台)</label><input type="number" name="important" value="0"></div>
             <div class="form-group"><label>預購商品(台)</label><input type="number" name="pre_order" value="0"></div>
             <div class="form-group"><label>O2O商品(台)</label><input type="number" name="o2o" value="0"></div>
-            <div class="form-group"><label>借貸商品(板)</label><input type="number" name="lend_item" value="0"></div>
-            <div class="form-group"><label>還貸商品(箱)</label><input type="number" name="ret_item" value="0"></div>
-            <div class="form-group"><label>跨廠調撥(板/箱)</label><input type="number" name="inter_plant" value="0"></div>
+            <div class="form-group"><label>調撥(板/箱)</label><input type="number" name="inter_plant" value="0"></div>
         </div>
 
         <div class="form-row">
-            <b>設備類：</b><br>
-            <div class="form-group"><label>空籠車(組)</label><input type="number" name="cage" value="0"></div>
-            <div class="form-group"><label>藍白防水罩(台)</label><input type="number" name="waterproof" value="0"></div>
+            <b>設備與借貸：</b><br>
+            <div class="form-group"><label>空籠(組)</label><input type="number" name="cage" value="0"></div>
+            <div class="form-group"><label>防水罩(台)</label><input type="number" name="waterproof" value="0"></div>
             <div class="form-group"><label>空籃(板/落)</label><input type="number" name="basket" value="0"></div>
-            <div class="form-group"><label>棧板 (黑/綠/木頭)</label><input type="number" name="pallet" value="0"></div>
-            <div class="form-group"><label>空籠車組數</label><input type="number" name="cage_set" value="0"></div>
+            <div class="form-group"><label>棧板(黑/綠/木)</label><input type="number" name="pallet" value="0"></div>
+            <div class="form-group"><label>籠車組數</label><input type="number" name="cage_set" value="0"></div>
+            <div class="form-group"><label>借貸(板)</label><input type="number" name="lend_item" value="0"></div>
+            <div class="form-group"><label>還貸(箱)</label><input type="number" name="ret_item" value="0"></div>
         </div>
         
         <br>
@@ -97,31 +94,36 @@
         <div class="cell">車次: {{ r.trip }}</div>
         <div class="cell">車號: {{ r.car_no }}</div>
         <div class="cell">噸數: {{ r.ton }}</div>
-        <div class="cell col-span-2" style="background: #fdfdfd;">（運務士簽章: __________）</div>
+        <div class="cell col-span-2">借貸: {{ r.lend_item }}板 / 還貸: {{ r.ret_item }}箱</div>
         
         <div class="cell">紅箱: {{ r.red_box }} 根</div>
         <div class="cell">營收袋: {{ r.money_bag }} 箱/板</div>
         <div class="cell">異常件: {{ r.error_item }} 板</div>
         <div class="cell">廢退: {{ r.waste_ret }} 箱</div>
-        <div class="cell col-span-2">借貸: {{ r.lend_item }} 板 / 還貸: {{ r.ret_item }} 箱</div>
-        
         <div class="cell">舊鞋: {{ r.shoes }} 板</div>
         <div class="cell">咖啡豆: {{ r.coffee }} 台</div>
+        
         <div class="cell">重要: {{ r.important }} 台</div>
         <div class="cell">預購: {{ r.pre_order }} 台</div>
         <div class="cell">O2O: {{ r.o2o }} 台</div>
         <div class="cell">調撥: {{ r.inter_plant }} 板/箱</div>
-        
         <div class="cell">空籠: {{ r.cage }} 組</div>
         <div class="cell">防水罩: {{ r.waterproof }} 台</div>
-        <div class="cell">空籃: {{ r.basket }} 板/落</div>
-        <div class="cell">棧板: {{ r.pallet }} 黑/綠/木</div>
-        <div class="cell col-span-2">籠車組數: {{ r.cage_set }} / 進/出車時間: __:__ / __:__</div>
         
-        <div class="cell col-span-6" style="text-align: left; background: #fdfdfd; font-size: 10px;">
-            <b>日翊轉運商品點交紀錄區：</b>
-            紅箱 / 營收袋 / 異常件 / 廢退 / 舊鞋救命 / 咖啡豆 / 重要商品 / 預購 / O2O商品 / 調撥 / 空籠 / 防水罩 / 空籃 / 棧板 / 籠車組數
+        <div class="cell col-span-2">空籃: {{ r.basket }} 板/落</div>
+        <div class="cell col-span-2">棧板: {{ r.pallet }} 黑/綠/木</div>
+        <div class="cell signature-cell" style="grid-row: span 3; grid-column: span 2; border-left: 2px solid black;">
+            運務士手寫簽名：<br><br><br><br>
         </div>
+        
+        <div class="cell col-span-2">籠車組數: {{ r.cage_set }}</div>
+        <div class="cell col-span-2">時間: __:__ / __:__</div>
+        
+        <div class="cell col-span-4" style="text-align: left; background: #fdfdfd; font-size: 10px;">
+            <b>日翊轉運商品點交紀錄區：</b><br>
+            紅箱/營收袋/異常件/廢退/舊鞋/咖啡豆/重要商品/預購/O2O/調撥/空籠/防水罩/空籃/棧板/籠車組數/時間
+        </div>
+        
     </div>
     {% endfor %}
 </div>
