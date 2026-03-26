@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, send_file
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -19,7 +20,7 @@ def add_record():
     data = request.form.to_dict()
     data['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db_records.append(data)
-    # 重新整理頁面
+    # 重整理頁面
     return render_template('index.html', records=db_records)
 
 @app.route('/download')
@@ -27,13 +28,16 @@ def download():
     if not db_records:
         return "目前沒有資料可下載"
     
+    # 將資料轉成 Excel 並下載，欄位依照分類排好
     df = pd.DataFrame(db_records)
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='點交紀錄')
     output.seek(0)
     
-    return send_file(output, as_attachment=True, download_name=f"點交表_{datetime.now().strftime('%m%d')}.xlsx")
+    return send_file(output, as_attachment=True, download_name=f"日翊文化點交表_{datetime.now().strftime('%m%d')}.xlsx")
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 這裡的設定可以讓你事後將專案放到網路上 (如 Render, Heroku)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
