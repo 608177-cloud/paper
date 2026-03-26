@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>日翊文化點交表登錄</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .form-section { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
+        .print-container { width: 210mm; } /* A4 寬度 */
+        .record-box { 
+            width: 100%; height: 55mm; /* 設定高度讓 5 格剛好滿一頁 */
+            border: 2px solid black; margin-bottom: 2px;
+            page-break-inside: avoid;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+        }
+        @media print {
+            .no-print { display: none; }
+            .record-box:nth-child(5n) { page-break-after: always; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <h2>🚚 點交表登錄系統</h2>
+        <form action="/add" method="post" class="form-section">
+            路線：<input type="text" name="route" placeholder="大肚->大溪">
+            車次：<input type="text" name="trip" size="5">
+            車號：<input type="text" name="car_no" size="10"><br><br>
+            46T <input type="checkbox" name="type_46"> | 17T <input type="checkbox" name="type_17">
+            <button type="submit">確認登錄</button>
+        </form>
+        <a href="/download"><button>下載 Excel</button></a>
+        <button onclick="window.print()">列印 A4 點交表</button>
+        <hr>
+    </div>
+
+    <div class="print-container">
+        {% for r in records %}
+        <div class="record-box">
+            <div style="grid-column: span 4; border-bottom: 1px solid black; background: #eee;">
+                <b>日翊文化轉運車商品點交表</b> ({{ r.timestamp }})
+            </div>
+            <div>路線: {{ r.route }}</div>
+            <div>車次: {{ r.trip }}</div>
+            <div>車號: {{ r.car_no }}</div>
+            <div>噸數: {{ '46T' if r.type_46 else '' }} {{ '17T' if r.type_17 else '' }}</div>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
