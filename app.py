@@ -241,20 +241,6 @@ with tab2:
             }
         )
 
-   # 3. 準備編輯表格：插入勾選欄位
-        # 注意：我們直接在顯示用的 DataFrame 增加欄位，不影響原始 df
-        display_df = df.copy()
-        display_df.insert(0, "🗑️刪除", False)
-        display_df.insert(1, "🖨️列印", False)
-        
-        # 使用 data_editor 讓使用者勾選
-        edited_df = st.data_editor(
-            display_df, 
-            hide_index=True, 
-            use_container_width=True,
-            key="main_editor"
-        )
-
         # 4. 按鈕區：使用最嚴格的對齊縮排
         col_btn1, col_btn2 = st.columns(2)
         
