@@ -248,27 +248,29 @@ with tab2:
             }
         )
 
-       # --- 按鈕區 (對齊修正版) ---
-     b1, b2 = st.columns(2)
+     # --- 操作按鈕區 (修正縮排與刪除邏輯) ---
+        b1, b2 = st.columns(2)
         
         with b1:
-            if st.button("🔥 確定刪除勾選項目"):
-                # 取得沒被勾選刪除的資料索引
-                keep_indices = edited_df[edited_df["🗑️刪除"] == False].index
+            if st.button("🔥 執行刪除選中項目"):
+                # 1. 找出沒被勾選刪除的資料 (我們要保留的資料)
+                keep_df = edited_df[edited_df["🗑️刪除"] == False].copy()
                 
-                if len(keep_indices) < len(edited_df):
-                    # 從原始 df 過濾出要保留的列，直接傳給 save_data
-                    # 這樣能避開 shape=(1, 0, 37) 的報錯
-                    new_df = df.loc[keep_indices].copy()
+                # 2. 如果有資料被勾選(保留的資料變少)，才執行刪除
+                if len(keep_df) < len(edited_df):
+                    # 移除為了 UI 顯示而插入的臨時勾選欄位，確保資料格式正確
+                    final_df = keep_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
                     
                     try:
-                        save_data(new_df)
-                        st.success("✅ 紀錄已刪除！")
-                        st.rerun() # 立即重新整理畫面
+                        # 3. 呼叫您的存檔函式
+                        save_data(final_df)
+                        st.success(f"✅ 已成功刪除 {len(edited_df) - len(keep_df)} 筆紀錄！")
+                        # 4. 強制重新整理
+                        st.rerun()
                     except Exception as e:
-                        st.error(f"存檔出錯：{e}")
+                        st.error(f"存檔時發生錯誤: {e}")
                 else:
-                    st.warning("請先勾選 🗑️")
+                    st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
