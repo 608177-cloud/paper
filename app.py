@@ -185,7 +185,6 @@ with tab1:
             st.success("資料已成功存檔！")
             st.rerun()
 
-# --- 修正後的列印生成邏輯 ---
 with tab2:
     st.markdown("### 📊 歷史紀錄與管理")
     df = load_data()
