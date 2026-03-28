@@ -127,7 +127,7 @@ with tab1:
             dx_item = st.selectbox("大溪倉項目 (0.2/1.3)", ["無", "0", "1", "2", "3"])
             dx_val = st.number_input("大溪數量", 0)
         with cx2:
-            ok_item = st.selectbox("岡山倉項目 (5/6)", ["無", "5", "6", "板", "箱"])
+            ok_item = st.selectbox("岡山倉項目 (5/6)", ["無", "5", "6"])
             ok_val = st.number_input("岡山數量", 0)
         with cx3:
             fast_loc = st.multiselect("時效件地區", ["大溪", "岡山"])
