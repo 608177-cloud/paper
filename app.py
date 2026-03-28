@@ -261,3 +261,6 @@ with tab2:
                 st.success("✅ 格式已生成！請直接按下 Ctrl + P。")
     else:
         st.info("尚無歷史紀錄。")
+# 請確保這段在 App 的最後一行，不要放在任何 if 或 tab 裡面
+if 'print_content' in st.session_state:
+    st.markdown(f'<div class="print-area">{st.session_state["print_content"]}</div>', unsafe_allow_html=True)
