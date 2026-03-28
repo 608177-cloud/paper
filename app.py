@@ -230,7 +230,7 @@ with tab2:
                             val = r.get(key, "")
                             return "" if pd.isna(val) else val
 
-                        # 完美對齊您照片中的 7 欄位格式
+                        # 完美對齊您照片中的欄位格式
                         print_html += f"""
                         <table class="print-table">
                             <tr class="header-row">
@@ -267,25 +267,40 @@ with tab2:
                         """
                     print_html += "</div>" # 結束一頁 A4
 
-                # 注入 CSS 隱藏網頁按鈕，只顯示乾淨的列印畫面
+                # 💡【修復核心】：不再隱藏 .stTabs 和 .stMarkdown，只隱藏不必要的按鈕與標籤
                 st.markdown(f"""
                 <style>
-                    .print-container {{ display: none; }}
+                    @media screen {{
+                        .print-container {{ display: none; }}
+                    }}
                     @media print {{
-                        [data-testid="stSidebar"], header, .stButton, [data-testid="stForm"], .stTabs, .stMarkdown, .stSelectbox, .stDownloadButton, [data-testid="stDataFrame"] {{ display: none !important; }}
+                        /* 只針對要隱藏的 UI 元素設定 display: none */
+                        [data-testid="stSidebar"], header, footer, [data-baseweb="tab-list"], 
+                        .stButton, .stSelectbox, [data-testid="stDataEditor"], .stDownloadButton {{ 
+                            display: none !important; 
+                        }}
+                        
+                        /* 解除寬度限制，讓列印區塊能佔滿 A4 */
+                        .main .block-container {{ 
+                            max-width: 100% !important; 
+                            padding: 0 !important; 
+                            margin: 0 !important; 
+                        }}
                         
                         .print-container {{ 
-                            display: block !important; position: absolute; top: 0; left: 0; 
-                            width: 100%; background: white; z-index: 9999; color: black;
+                            display: block !important; 
+                            width: 100%; 
+                            background: white !important; 
+                            color: black !important;
                             font-family: "Microsoft JhengHei", sans-serif;
                         }}
                         
                         @page {{ size: A4 portrait; margin: 8mm; }}
                         
-                        .a4-page {{ width: 100%; height: 280mm; display: flex; flex-direction: column; justify-content: flex-start; page-break-after: always; }}
+                        .a4-page {{ width: 100%; display: flex; flex-direction: column; justify-content: flex-start; page-break-after: always; }}
                         .print-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; font-size: 20px; }}
-                        .print-title {{ font-weight: bold; letter-spacing: 2px; }}
-                        .print-date {{ font-size: 16px; margin-bottom: 2px; }}
+                        .print-title {{ font-weight: bold; letter-spacing: 2px; text-align: left; }}
+                        .print-date {{ font-size: 16px; margin-bottom: 2px; text-align: right; }}
                         .print-table {{ width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-bottom: 15px; table-layout: fixed; }}
                         .print-table th, .print-table td {{ border: 1px solid #000; padding: 2px 1px; height: 22px; vertical-align: middle; overflow: hidden; }}
                         .header-row {{ background-color: #e6e6e6 !important; font-weight: bold; -webkit-print-color-adjust: exact; }}
@@ -295,6 +310,6 @@ with tab2:
                 <div class="print-container">{print_html}</div>
                 """, unsafe_allow_html=True)
                 
-                st.success("✅ 版面已生成！請直接按下鍵盤 **Ctrl + P** (或右鍵選擇列印)，出現的預覽畫面就會和您的紙本 100% 相同。")
+                st.success("✅ 版面已生成！請直接按下鍵盤 **Ctrl + P**，預覽畫面應該就會出現了。")
     else:
         st.info("目前尚無歷史紀錄。")
