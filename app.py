@@ -5,8 +5,53 @@ import os
 
 # --- 1. 頁面基本配置 ---
 st.set_page_config(page_title="日翊文化點交系統-完整同步版", layout="wide")
+# --- 2. 強化列印樣式  ---
+st.markdown("""
+    <style>
+    /* 網頁顯示用標題 */
+    .report-title { font-size: 28px; font-weight: bold; text-align: center; color: #1E3A8A; margin-bottom: 20px; }
+    .section-head { background-color: #F3F4F6; padding: 5px 10px; border-left: 5px solid #3B82F6; font-weight: bold; margin-top: 15px; }
+    
+    /* 平常在網頁上隱藏列印內容 */
+    .print-area { display: none; }
 
-# --- 2. 資料持久化邏輯 (補齊所有欄位，確保不報錯) ---
+    @media print {
+        /* 1. 隱藏所有 Streamlit 網頁元素 */
+        header, footer, [data-testid="stSidebar"], .stTabs, .stButton, 
+        .stDownloadButton, [data-testid="stDataEditor"], .report-title, 
+        [data-testid="stHeader"], .stSelectbox, .stAlert { 
+            display: none !important; 
+        }
+        
+        /* 2. 顯示列印專用區域 */
+        .print-area { 
+            display: block !important; 
+            position: absolute; top: 0; left: 0; width: 100%; 
+            background: white !important; color: black !important;
+            font-family: "Microsoft JhengHei", sans-serif;
+        }
+
+        /* 3. A4 設定 */
+        @page { size: A4 portrait; margin: 10mm 8mm; }
+        .a4-page { width: 100%; page-break-after: always; }
+        
+        /* 4. 標題與日期對齊 (左標題、右日期) */
+        .print-header-row { 
+            display: flex; justify-content: space-between; align-items: flex-end; 
+            margin-bottom: 10px; width: 100%;
+        }
+        .print-main-title { font-size: 22px; font-weight: bold; }
+        .print-date-line { font-size: 16px; }
+        
+        /* 5. 表格樣式 (對齊附圖) */
+        .print-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-bottom: 12px; table-layout: fixed; }
+        .print-table td { border: 1px solid black; height: 22px; padding: 2px; }
+        .bg-gray { background-color: #eeeeee !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+        .unit-text { font-size: 8px; font-weight: normal; }
+    }
+    </style>
+""", unsafe_allow_html=True)
+# --- 3. 資料持久化邏輯 (補齊所有欄位，確保不報錯) ---
 DB_FILE = "delivery_data.csv"
 
 def load_data():
@@ -145,171 +190,74 @@ with tab2:
     df = load_data()
     
     if not df.empty:
-        # --- 預防 KeyError 當機：自動補齊舊資料缺少的欄位 ---
+        # 欄位補齊防呆
         expected_cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
                         "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
                         "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C"]
         for c in expected_cols:
-            if c not in df.columns:
-                df[c] = ""
+            if c not in df.columns: df[c] = ""
 
-        # --- 2. 保留日期篩選功能 ---
-        col_f1, col_f2 = st.columns([1, 3])
-        with col_f1:
-            try:
-                df['日期格式'] = pd.to_datetime(df['日期']).dt.date
-            except:
-                df['日期格式'] = df['日期']
-            
-            unique_dates = df['日期格式'].dropna().unique().tolist()
-            selected_date = st.selectbox("📅 篩選日期", ["顯示全部"] + unique_dates)
+        # 下載與篩選區
+        c_f1, c_f2 = st.columns([1, 3])
+        with c_f1:
+            df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
+            sel_date = st.selectbox("📅 篩選日期", ["全部顯示"] + sorted(df['日期篩選'].unique().tolist(), reverse=True))
+        with c_f2:
+            st.download_button("📥 下載完整 CSV 備份", df.to_csv(index=False).encode('utf-8-sig'), "backup.csv", "text/csv")
 
-        with col_f2:
-            # --- 4. 保留下載完整的 CSV 備份功能 ---
-            csv_data = df.drop(columns=['日期格式'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 下載完整 CSV 備份",
-                data=csv_data,
-                file_name="delivery_backup.csv",
-                mime="text/csv"
-            )
-
-        # 應用篩選
         display_df = df.copy()
-        if selected_date != "顯示全部":
-            display_df = display_df[display_df['日期格式'] == selected_date]
-        display_df = display_df.drop(columns=['日期格式'], errors='ignore')
+        if sel_date != "全部顯示":
+            display_df = display_df[display_df['日期篩選'] == sel_date]
+        display_df = display_df.drop(columns=['日期篩選'])
 
-        # --- 3. 紀錄表最左邊改成點選 icon ---
+        # 點選 Icon 勾選功能
         display_df.insert(0, "🖨️列印", False)
+        edited_df = st.data_editor(display_df, hide_index=True, use_container_width=True,
+                                   column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)})
 
-        st.markdown("##### 📌 點交資料列表 (請勾選最左側『🖨️列印』，然後點擊下方按鈕生成報表)")
-        
-        # --- 1. 歷史紀錄中看到所有儲存的資料數字列表 ---
-        edited_df = st.data_editor(
-            display_df,
-            hide_index=True,
-            column_config={
-                "🖨️列印": st.column_config.CheckboxColumn("🖨️列印", help="勾選以列印此筆資料", default=False)
-            },
-            disabled=df.columns.tolist(), # 鎖定原始資料不被誤改，只能勾選第一欄
-            use_container_width=True
-        )
-
-        selected_rows = edited_df[edited_df["🖨️列印"] == True]
-
-        # --- 5. 點選後，產生與附圖一樣的 A4 表格 (1標題接5個小表格) ---
-        if not selected_rows.empty:
-            if st.button("🖨️ 產生 A4 列印報表 (對齊實體紙本 5 格格式)"):
-                records = selected_rows.to_dict('records')
+        # 生成列印內容
+        selected_data = edited_df[edited_df["🖨️列印"] == True]
+        if not selected_data.empty:
+            if st.button("🖨️ 準備列印資料 (完成後請按 Ctrl+P)"):
+                records = selected_data.to_dict('records')
+                num_pages = (len(records) + 4) // 5
+                final_html = ""
                 
-                # 計算需要幾頁 (每頁印滿 5 個表格)
-                total_records = len(records)
-                pages = (total_records + 4) // 5 
-                
-                print_html = ""
-                for page in range(pages):
-                    print_html += f"""
-                    <div class="a4-page">
-                        <div class="print-header">
-                            <div class="print-title">日翊文化轉運車轉運商品點交表</div>
-                            <div class="print-date"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>
-                        </div>
-                    """
+                for p in range(num_pages):
+                    final_html += '<div class="a4-page">'
+                    final_html += '<div class="print-header-row">'
+                    final_html += '<div class="print-main-title">日翊文化轉運車轉運商品點交表</div>'
+                    final_html += '<div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>'
+                    final_html += '</div>'
                     
-                    # 每一頁固定產出 5 個小表格
                     for i in range(5):
-                        record_idx = page * 5 + i
-                        if record_idx < total_records:
-                            r = records[record_idx]
-                        else:
-                            # 勾選不足 5 筆時，自動補上完全空白的表格
-                            r = {col: "" for col in expected_cols}
+                        idx = p * 5 + i
+                        r = records[idx] if idx < len(records) else {c: "" for c in expected_cols}
                         
-                        def safe_v(key):
-                            val = r.get(key, "")
-                            return "" if pd.isna(val) else val
-
-                        # 完美對齊您照片中的欄位格式
-                        print_html += f"""
+                        # 生成單個 5 格小表格 (依照您的附圖欄位)
+                        final_html += f"""
                         <table class="print-table">
-                            <tr class="header-row">
-                                <td width="14%">配送起訖</td><td width="14%">車次</td><td width="14%">車號</td><td width="14%">運務士簽章</td><td width="14%">派車噸數</td><td width="14%">進廠時間</td><td width="16%">出車時間</td>
-                            </tr>
-                            <tr>
-                                <td>{safe_v('路線')}</td><td>{safe_v('車次')}</td><td>{safe_v('車號')}</td><td></td><td>{safe_v('噸數')}</td><td>{safe_v('進廠')}</td><td>{safe_v('出車')}</td>
-                            </tr>
-                            <tr class="header-row">
-                                <td>大溪倉<br><span class="unit">0.2/1.3</span></td><td>岡山倉<br><span class="unit">5/6</span></td><td>時效件<br><span class="unit">大溪/岡山</span></td><td>特殊件<br><span class="unit">大溪/岡山</span></td><td>紅箱</td><td>營收袋</td><td>剩餘</td>
-                            </tr>
-                            <tr>
-                                <td>{safe_v('大溪倉')}</td><td>{safe_v('岡山倉')}</td><td>{safe_v('時效')}</td><td>{safe_v('特殊')}</td><td>{safe_v('紅箱')}</td><td>{safe_v('營收袋')}</td><td>{safe_v('剩餘')}</td>
-                            </tr>
-                            <tr class="header-row">
-                                <td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td>
-                            </tr>
-                            <tr>
-                                <td>{safe_v('污衣')}</td><td>{safe_v('潔衣')}</td><td>{safe_v('舊鞋')}</td><td>{safe_v('咖啡')}</td><td>0</td><td>{safe_v('異常')}</td><td>{safe_v('廠退')}</td>
-                            </tr>
-                            <tr class="header-row">
-                                <td>O2O商品<br><span class="unit">大溪/岡山</span></td><td>預購<br><span class="unit">大溪/岡山/台東</span></td><td>跨廠調撥</td><td>重要文件<br><span class="unit">大溪/岡山</span></td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td>
-                            </tr>
-                            <tr>
-                                <td>{safe_v('O2O')}</td><td>{safe_v('預購')}</td><td>{safe_v('調撥')}</td><td>{safe_v('文件')}</td><td>{safe_v('商品')}</td><td>{safe_v('借還')}</td><td></td>
-                            </tr>
-                            <tr class="header-row">
-                                <td>龍車防水罩</td><td>藍白防水罩</td><td>棧板<br><span class="unit">黑膠/綠色/木頭</span></td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td>
-                            </tr>
-                            <tr>
-                                <td>{safe_v('龍罩')}</td><td>{safe_v('藍罩')}</td><td>{safe_v('棧板')}</td><td>{safe_v('空籃')}</td><td>{safe_v('空龍')}</td><td>{safe_v('地墊')}</td><td>{safe_v('B2C')}</td>
-                            </tr>
+                            <tr class="bg-gray"><td>配送起訖</td><td>車次</td><td>車號</td><td>運務士簽章</td><td>噸數</td><td>進廠</td><td>出車</td></tr>
+                            <tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr>
+                            <tr class="bg-gray"><td>大溪倉<br><span class="unit-text">0.2/1.3</span></td><td>岡山倉<br><span class="unit-text">5/6</span></td><td>時效件</td><td>特殊件</td><td>紅箱</td><td>營收袋</td><td>剩餘</td></tr>
+                            <tr><td>{r.get('大溪倉','')}</td><td>{r.get('岡山倉','')}</td><td>{r.get('時效','')}</td><td>{r.get('特殊','')}</td><td>{r.get('紅箱','')}</td><td>{r.get('營收袋','')}</td><td>{r.get('剩餘','')}</td></tr>
+                            <tr class="bg-gray"><td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td></tr>
+                            <tr><td>{r.get('污衣','')}</td><td>{r.get('潔衣','')}</td><td>{r.get('舊鞋','')}</td><td>{r.get('咖啡','')}</td><td>0</td><td>{r.get('異常','')}</td><td>{r.get('廠退','')}</td></tr>
+                            <tr class="bg-gray"><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td></tr>
+                            <tr><td>{r.get('O2O','')}</td><td>{r.get('預購','')}</td><td>{r.get('調撥','')}</td><td>{r.get('文件','')}</td><td>{r.get('商品','')}</td><td>{r.get('借還','')}</td><td></td></tr>
+                            <tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr>
+                            <tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr>
                         </table>
                         """
-                    print_html += "</div>" # 結束一頁 A4
-
-                # 💡【修復核心】：不再隱藏 .stTabs 和 .stMarkdown，只隱藏不必要的按鈕與標籤
-                st.markdown(f"""
-                <style>
-                    @media screen {{
-                        .print-container {{ display: none; }}
-                    }}
-                    @media print {{
-                        /* 只針對要隱藏的 UI 元素設定 display: none */
-                        [data-testid="stSidebar"], header, footer, [data-baseweb="tab-list"], 
-                        .stButton, .stSelectbox, [data-testid="stDataEditor"], .stDownloadButton {{ 
-                            display: none !important; 
-                        }}
-                        
-                        /* 解除寬度限制，讓列印區塊能佔滿 A4 */
-                        .main .block-container {{ 
-                            max-width: 100% !important; 
-                            padding: 0 !important; 
-                            margin: 0 !important; 
-                        }}
-                        
-                        .print-container {{ 
-                            display: block !important; 
-                            width: 100%; 
-                            background: white !important; 
-                            color: black !important;
-                            font-family: "Microsoft JhengHei", sans-serif;
-                        }}
-                        
-                        @page {{ size: A4 portrait; margin: 8mm; }}
-                        
-                        .a4-page {{ width: 100%; display: flex; flex-direction: column; justify-content: flex-start; page-break-after: always; }}
-                        .print-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; font-size: 20px; }}
-                        .print-title {{ font-weight: bold; letter-spacing: 2px; text-align: left; }}
-                        .print-date {{ font-size: 16px; margin-bottom: 2px; text-align: right; }}
-                        .print-table {{ width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-bottom: 15px; table-layout: fixed; }}
-                        .print-table th, .print-table td {{ border: 1px solid #000; padding: 2px 1px; height: 22px; vertical-align: middle; overflow: hidden; }}
-                        .header-row {{ background-color: #e6e6e6 !important; font-weight: bold; -webkit-print-color-adjust: exact; }}
-                        .unit {{ font-size: 9px; font-weight: normal; }}
-                    }}
-                </style>
-                <div class="print-container">{print_html}</div>
-                """, unsafe_allow_html=True)
+                    final_html += "</div>"
                 
-                st.success("✅ 版面已生成！請直接按下鍵盤 **Ctrl + P**，預覽畫面應該就會出現了。")
+                # 將 HTML 存入 Session 狀態
+                st.session_state['print_content'] = final_html
+                st.success("✅ 列印預覽已準備就緒！現在請直接按下 **Ctrl + P** 即可列印。")
+
     else:
-        st.info("目前尚無歷史紀錄。")
+        st.info("尚無歷史紀錄。")
+
+# --- 第三步：將列印容器放在 App 最後 (確保它在 DOM 最外層) ---
+if 'print_content' in st.session_state:
+    st.markdown(f'<div class="print-area">{st.session_state["print_content"]}</div>', unsafe_allow_html=True)
