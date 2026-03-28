@@ -249,7 +249,7 @@ with tab2:
         )
 
     # --- 刪除功能修正版 ---
-       b1, b2 = st.columns(2)
+        b1, b2 = st.columns(2)
         
         with b1:
             if st.button("🔥 確定執行刪除"):
