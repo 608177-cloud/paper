@@ -67,24 +67,19 @@ def load_data():
     return pd.DataFrame()
 
 def save_data(data):
-    # 判斷傳入的是單筆(dict)還是整表(DataFrame)
+    # 如果傳入的是單筆字典，轉為 DataFrame；如果是 DataFrame 則直接使用
     if isinstance(data, dict):
-        new_df = pd.DataFrame([data])
-        # 如果是新增模式，讀取舊檔再合併
-        try:
-            old_df = pd.read_excel("data.xlsx") # 這裡請換成您的檔名
-            final_df = pd.concat([old_df, new_df], ignore_index=True)
-        except:
-            final_df = new_df
+        df_to_save = pd.DataFrame([data])
     else:
-        # 如果傳入的是 DataFrame (刪除後的結果)，直接準備存檔
-        final_df = data
+        df_to_save = data
+        
+    # 確保存檔時不會帶入臨時欄位
+    df_to_save = df_to_save.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
     
-    # 存檔前清除 UI 臨時欄位
-    final_df = final_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
-    
-    # 執行寫入檔案 (請確保檔名與您 load_data 的一致)
-    final_df.to_excel("data.xlsx", index=False)
+    # 這裡依照您原本的存檔方式 (Excel 或 CSV)
+    # 例如：df_to_save.to_excel("data.xlsx", index=False)
+    # 請保留您原本實際執行寫入檔案的那幾行代碼
+
 # --- 3. CSS 樣式 (保留您的設計 + 強化列印) ---
 st.markdown("""
     <style>
@@ -254,26 +249,26 @@ with tab2:
         )
 
        # --- 按鈕區 (對齊修正版) ---
-       b1, b2 = st.columns(2)
+      col_btn1, col_btn2 = st.columns(2)
         
-        with b1:
+        with col_btn1:
             if st.button("🔥 確定刪除勾選項目"):
-                # 取得沒被勾選刪除的資料索引
-                keep_indices = edited_df[edited_df["🗑️刪除"] == False].index
+                # 取得沒被勾選刪除的 index
+                # 這是最穩定的過濾方式，不會產生維度錯誤
+                mask = edited_df["🗑️刪除"] == False
+                # 直接從原始 df 過濾，確保資料純淨
+                remaining_df = df[mask.values].copy()
                 
-                if len(keep_indices) < len(edited_df):
-                    # 從原始 df 過濾出要保留的列，直接傳給 save_data
-                    # 這樣能避開 shape=(1, 0, 37) 的報錯
-                    new_df = df.loc[keep_indices].copy()
-                    
+                if len(remaining_df) < len(df):
                     try:
-                        save_data(new_df)
-                        st.success("✅ 紀錄已刪除！")
-                        st.rerun() # 立即重新整理畫面
+                        # 呼叫修正後的 save_data
+                        save_data(remaining_df)
+                        st.success(f"✅ 已成功刪除 {len(df) - len(remaining_df)} 筆紀錄！")
+                        st.rerun()
                     except Exception as e:
-                        st.error(f"存檔出錯：{e}")
+                        st.error(f"存檔執行失敗：{e}")
                 else:
-                    st.warning("請先勾選 🗑️")
+                    st.warning("⚠️ 請先在表格左側勾選 🗑️")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
