@@ -249,26 +249,26 @@ with tab2:
         )
 
        # --- 按鈕區 (對齊修正版) ---
-      col_btn1, col_btn2 = st.columns(2)
+     b1, b2 = st.columns(2)
         
-        with col_btn1:
+        with b1:
             if st.button("🔥 確定刪除勾選項目"):
-                # 取得沒被勾選刪除的 index
-                # 這是最穩定的過濾方式，不會產生維度錯誤
-                mask = edited_df["🗑️刪除"] == False
-                # 直接從原始 df 過濾，確保資料純淨
-                remaining_df = df[mask.values].copy()
+                # 取得沒被勾選刪除的資料索引
+                keep_indices = edited_df[edited_df["🗑️刪除"] == False].index
                 
-                if len(remaining_df) < len(df):
+                if len(keep_indices) < len(edited_df):
+                    # 從原始 df 過濾出要保留的列，直接傳給 save_data
+                    # 這樣能避開 shape=(1, 0, 37) 的報錯
+                    new_df = df.loc[keep_indices].copy()
+                    
                     try:
-                        # 呼叫修正後的 save_data
-                        save_data(remaining_df)
-                        st.success(f"✅ 已成功刪除 {len(df) - len(remaining_df)} 筆紀錄！")
-                        st.rerun()
+                        save_data(new_df)
+                        st.success("✅ 紀錄已刪除！")
+                        st.rerun() # 立即重新整理畫面
                     except Exception as e:
-                        st.error(f"存檔執行失敗：{e}")
+                        st.error(f"存檔出錯：{e}")
                 else:
-                    st.warning("⚠️ 請先在表格左側勾選 🗑️")
+                    st.warning("請先勾選 🗑️")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
