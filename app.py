@@ -190,66 +190,74 @@ with tab2:
     df = load_data()
     
     if not df.empty:
-        # 1. 欄位補齊防呆：確保所有可能用到的欄位都存在
+        # 1. 確保所有欄位都存在，避免 KeyError
         expected_cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
                         "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
-                        "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", 
-                        "商品", "異常", "借還", "B2C", "退貨通"]
+                        "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C", "退貨通"]
         for c in expected_cols:
-            if c not in df.columns: 
-                df[c] = ""
+            if c not in df.columns: df[c] = ""
 
-        # 下載與篩選區
-        c_f1, c_f2 = st.columns([1, 3])
-        with c_f1:
-            df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
-            sel_date = st.selectbox("📅 篩選日期", ["全部顯示"] + sorted(df['日期篩選'].unique().tolist(), reverse=True))
-        with c_f2:
-            st.download_button("📥 下載完整 CSV 備份", df.to_csv(index=False).encode('utf-8-sig'), "backup.csv", "text/csv")
-
+        # 日期篩選區
+        df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
+        sel_date = st.selectbox("📅 篩選日期", ["全部顯示"] + sorted(df['日期篩選'].unique().tolist(), reverse=True))
+        
         display_df = df.copy()
         if sel_date != "全部顯示":
             display_df = display_df[display_df['日期篩選'] == sel_date]
         display_df = display_df.drop(columns=['日期篩選'])
 
-        # 點選 Icon 勾選功能
+        # 2. 顯示編輯器：確保正確賦值給 edited_df 避免 NameError
         display_df.insert(0, "🖨️列印", False)
-        # 確保正確賦值給 edited_df 以避免 NameError
-        edited_df = st.data_editor(display_df, hide_index=True, use_container_width=True,
-                                   column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)})
+        edited_df = st.data_editor(
+            display_df, 
+            hide_index=True, 
+            use_container_width=True,
+            column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)}
+        )
 
-        # 生成列印內容
+        # 3. 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
         
         if not selected_data.empty:
-            if st.button("🖨️ 準備列印資料 (完成後請按 Ctrl+P)"):
-                # 關鍵修正 1：先處理 NaN 為空字串，再轉為字典
-                clean_selected = selected_data.fillna('').astype(str)
-                records = clean_selected.to_dict('records')
+            if st.button("🖨️ 準備列印 (完成後請按 Ctrl+P)"):
+                # 修正 nan 問題：不使用 np.nan 避免錯誤
+                clean_df = selected_data.fillna('').astype(str)
+                records = clean_df.to_dict('records')
                 
                 num_pages = (len(records) + 4) // 5
-                html_buffer = []
+                final_html = ""
                 
                 for p in range(num_pages):
-                    html_buffer.append('<div class="a4-page">')
-                    html_buffer.append('<div class="print-header-row">')
-                    html_buffer.append('<div class="print-main-title">日翊文化轉運車轉運商品點交表</div>')
-                    html_buffer.append('<div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>')
-                    html_buffer.append('</div>')
+                    # A4 分頁容器
+                    final_html += '<div class="a4-page">'
+                    # 標題與日期列
+                    final_html += '<div class="print-header-row">'
+                    final_html += '<div class="print-main-title">日翊文化轉運車轉運商品點交表</div>'
+                    final_html += '<div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>'
+                    final_html += '</div>'
                     
                     for i in range(5):
                         idx = p * 5 + i
-                        # 如果超出選取數量則產空表格填滿 A4 頁面
                         r = records[idx] if idx < len(records) else {c: "" for c in expected_cols}
                         
-                        # 關鍵修正 2：將 HTML 緊湊排列，移除多餘換行符號防止 Streamlit 解析錯誤
-                        table_html = f"""<table class="print-table"><tr class="bg-gray"><td style="width:14%">配送起訖</td><td style="width:10%">車次</td><td style="width:14%">車號</td><td style="width:14%">運務士簽章</td><td style="width:12%">噸數</td><td style="width:12%">進廠</td><td style="width:12%">出車</td></tr><tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr><tr class="bg-gray"><td>大溪倉(0.2/1.3)</td><td>岡山倉(5/6)</td><td>時效件</td><td>特殊件</td><td>紅箱</td><td>營收袋</td><td>剩餘</td></tr><tr><td>{r.get('大溪倉','')}</td><td>{r.get('岡山倉','')}</td><td>{r.get('時效','')}</td><td>{r.get('特殊','')}</td><td>{r.get('紅箱','')}</td><td>{r.get('營收袋','')}</td><td>{r.get('剩餘','')}</td></tr><tr class="bg-gray"><td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td></tr><tr><td>{r.get('污衣','')}</td><td>{r.get('潔衣','')}</td><td>{r.get('舊鞋','')}</td><td>{r.get('咖啡','')}</td><td>{r.get('退貨通','')}</td><td>{r.get('異常','')}</td><td>{r.get('廠退','')}</td></tr><tr class="bg-gray"><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td></tr><tr><td>{r.get('O2O','')}</td><td>{r.get('預購','')}</td><td>{r.get('調撥','')}</td><td>{r.get('文件','')}</td><td>{r.get('商品','')}</td><td>{r.get('借還','')}</td><td></td></tr><tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr><tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr></table>"""
-                        html_buffer.append(table_html)
-                    
-                    html_buffer.append('</div>')
+                        # 4. 恢復精準的表格佈局
+                        final_html += f"""
+                        <table class="print-table">
+                            <tr class="bg-gray"><td>配送起訖</td><td>車次</td><td>車號</td><td>運務士簽章</td><td>噸數</td><td>進廠</td><td>出車</td></tr>
+                            <tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr>
+                            <tr class="bg-gray"><td>大溪倉(0.2/1.3)</td><td>岡山倉(5/6)</td><td>時效件</td><td>特殊件</td><td>紅箱</td><td>營收袋</td><td>剩餘</td></tr>
+                            <tr><td>{r.get('大溪倉','')}</td><td>{r.get('岡山倉','')}</td><td>{r.get('時效','')}</td><td>{r.get('特殊','')}</td><td>{r.get('紅箱','')}</td><td>{r.get('營收袋','')}</td><td>{r.get('剩餘','')}</td></tr>
+                            <tr class="bg-gray"><td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td></tr>
+                            <tr><td>{r.get('污衣','')}</td><td>{r.get('潔衣','')}</td><td>{r.get('舊鞋','')}</td><td>{r.get('咖啡','')}</td><td>{r.get('退貨通','')}</td><td>{r.get('異常','')}</td><td>{r.get('廠退','')}</td></tr>
+                            <tr class="bg-gray"><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td></tr>
+                            <tr><td>{r.get('O2O','')}</td><td>{r.get('預購','')}</td><td>{r.get('調撥','')}</td><td>{r.get('文件','')}</td><td>{r.get('商品','')}</td><td>{r.get('借還','')}</td><td></td></tr>
+                            <tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr>
+                            <tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr>
+                        </table>
+                        """
+                    final_html += "</div>"
                 
-                # 將所有 HTML 片段合併為單一字串
-                st.session_state['print_content'] = "".join(html_buffer)
-                st.success("✅ 列印預覽已準備就緒！請直接按下 **Ctrl + P** 即可列印。")
+                st.session_state['print_content'] = final_html
+                st.success("✅ 格式已生成！請直接按下 Ctrl + P。")
     else:
         st.info("尚無歷史紀錄。")
