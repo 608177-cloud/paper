@@ -248,29 +248,34 @@ with tab2:
             }
         )
 
-     # --- 操作按鈕區 (修正縮排與刪除邏輯) ---
+     # --- 強制覆蓋版按鈕區 ---
         b1, b2 = st.columns(2)
         
         with b1:
-            if st.button("🔥 執行刪除選中項目"):
-                # 1. 找出沒被勾選刪除的資料 (我們要保留的資料)
-                keep_df = edited_df[edited_df["🗑️刪除"] == False].copy()
+            if st.button("🔥 確定執行刪除"):
+                # 1. 找出「沒有」被勾選刪除的資料 (我們要留下來的)
+                # 使用 .values 確保布林值對應正確
+                keep_mask = edited_df["🗑️刪除"] == False
                 
-                # 2. 如果有資料被勾選(保留的資料變少)，才執行刪除
-                if len(keep_df) < len(edited_df):
-                    # 移除為了 UI 顯示而插入的臨時勾選欄位，確保資料格式正確
-                    final_df = keep_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
-                    
+                # 2. 直接從 df 篩選出要保留的列
+                # 這能避開所有 "Must pass 2-d input" 的報錯
+                new_df = df[keep_mask.values].copy()
+                
+                if len(new_df) < len(df):
                     try:
-                        # 3. 呼叫您的存檔函式
-                        save_data(final_df)
-                        st.success(f"✅ 已成功刪除 {len(edited_df) - len(keep_df)} 筆紀錄！")
-                        # 4. 強制重新整理
-                        st.rerun()
+                        # 3. 關鍵：不呼叫 save_data，直接在這裡寫入檔案
+                        # 先移除 UI 用的臨時欄位
+                        save_df = new_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
+                        
+                        # 直接覆蓋 Excel 檔案
+                        save_df.to_excel("data.xlsx", index=False) 
+                        
+                        st.success(f"✅ 成功！已刪除 {len(df) - len(new_df)} 筆資料")
+                        st.rerun() 
                     except Exception as e:
-                        st.error(f"存檔時發生錯誤: {e}")
+                        st.error(f"存檔失敗，請確認 Excel 檔是否開啟中：{e}")
                 else:
-                    st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位")
+                    st.warning("⚠️ 請先勾選表格左側的 🗑️")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
