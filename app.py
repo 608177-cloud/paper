@@ -248,34 +248,34 @@ with tab2:
             }
         )
 
-     # --- 強制覆蓋版按鈕區 ---
-        b1, b2 = st.columns(2)
+    # --- 刪除功能修正版 ---
+        col_btn1, col_btn2 = st.columns(2)
         
-        with b1:
+        with col_btn1:
             if st.button("🔥 確定執行刪除"):
-                # 1. 找出「沒有」被勾選刪除的資料 (我們要留下來的)
-                # 使用 .values 確保布林值對應正確
-                keep_mask = edited_df["🗑️刪除"] == False
-                
-                # 2. 直接從 df 篩選出要保留的列
-                # 這能避開所有 "Must pass 2-d input" 的報錯
-                new_df = df[keep_mask.values].copy()
-                
-                if len(new_df) < len(df):
-                    try:
-                        # 3. 關鍵：不呼叫 save_data，直接在這裡寫入檔案
-                        # 先移除 UI 用的臨時欄位
-                        save_df = new_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
+                try:
+                    # 1. 找出哪些列「沒有」被勾選刪除 (我們要保留的)
+                    # 使用 .values 確保布林判斷準確
+                    keep_mask = edited_df["🗑️刪除"] == False
+                    
+                    # 2. 篩選出要留下的資料，這能徹底避開 2-D input 報錯
+                    new_df = df[keep_mask.values].copy()
+                    
+                    if len(new_df) < len(df):
+                        # 3. 準備存檔：移除 UI 臨時欄位
+                        # 這裡直接執行存檔，跳過可能損壞的 save_data 函式
+                        final_to_save = new_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
                         
-                        # 直接覆蓋 Excel 檔案
-                        save_df.to_excel("data.xlsx", index=False) 
+                        # 4. 直接寫入 Excel (請確認檔名正確)
+                        final_to_save.to_excel("data.xlsx", index=False) 
                         
-                        st.success(f"✅ 成功！已刪除 {len(df) - len(new_df)} 筆資料")
+                        st.success(f"✅ 刪除成功！已移除 {len(df) - len(new_df)} 筆紀錄")
                         st.rerun() 
-                    except Exception as e:
-                        st.error(f"存檔失敗，請確認 Excel 檔是否開啟中：{e}")
-                else:
-                    st.warning("⚠️ 請先勾選表格左側的 🗑️")
+                    else:
+                        st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位")
+                except Exception as e:
+                    # 如果點擊沒反應，這裡會抓出具體原因 (例如：檔案被 Excel 開啟中)
+                    st.error(f"❌ 刪除失敗，錯誤原因：{e}")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
