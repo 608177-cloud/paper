@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 
 # --- 1. 頁面基本配置 ---
-st.set_page_config(page_title="日翊文化點交系統-全欄位修復版", layout="wide")
+st.set_page_config(page_title="日翊文化點交系統-列印完美修復版", layout="wide")
 
 # --- 2. 資料持久化邏輯 ---
 DB_FILE = "delivery_data_final.csv"
@@ -34,12 +34,26 @@ def delete_data(index_to_delete):
 st.markdown("""
     <style>
     .print-container { display: none; }
+    
     @media print {
-        [data-testid="stSidebar"], [data-testid="stHeader"], .stButton, .no-print, [data-testid="stForm"], [data-testid="stTabs"] {
+        /* 隱藏預設按鈕與側邊欄，但保留主畫面以防預覽消失 */
+        [data-testid="stSidebar"], header[data-testid="stHeader"], .stButton, [data-testid="stForm"] {
             display: none !important;
         }
+        
+        /* 讓列印容器絕對定位，直接覆蓋整個畫面，解決空白問題 */
+        .print-container { 
+            display: block !important; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            background-color: white; 
+            z-index: 99999;
+        }
+        
         @page { size: A4; margin: 0.5cm; }
-        .print-container { display: block !important; }
+        
         .logistics-card {
             width: 100%; height: 5.4cm; border: 2px solid black;
             margin-bottom: 0.2cm; padding: 8px; font-size: 10px;
@@ -47,13 +61,14 @@ st.markdown("""
             position: relative;
         }
         .print-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; }
-        .print-title { font-size: 16px; font-weight: bold; }
-        .print-date-field { font-size: 14px; }
+        .print-title { font-size: 18px; font-weight: bold; }
+        .print-date-field { font-size: 14px; font-weight: bold; }
         .print-table { width: 100%; border-collapse: collapse; }
         .print-table td { border: 1px solid black; text-align: center; padding: 2px; }
         .header-cell { background-color: #eeeeee !important; font-weight: bold; }
         .sign-area { margin-top: 15px; display: flex; justify-content: space-between; }
     }
+    
     .report-title { font-size: 26px; font-weight: bold; text-align: center; color: #1E3A8A; }
     .section-head { background-color: #F3F4F6; padding: 2px 10px; border-left: 5px solid #3B82F6; font-weight: bold; margin-top: 10px; }
     </style>
@@ -95,7 +110,6 @@ with tab1:
             spec_loc = st.multiselect("特殊件地區", ["大溪", "岡山"])
             spec_val = st.number_input("特殊件(台)", 0)
 
-        # 這裡補齊之前遺失的「第三區」與「第四區」紙本欄位
         st.markdown("<div class='section-head'>三、詳細商品明細</div>", unsafe_allow_html=True)
         r1, r2, r3, r4 = st.columns(4)
         with r1:
@@ -137,7 +151,6 @@ with tab1:
         st.write("---")
         submit = st.form_submit_button("✅ 儲存資料")
         if submit:
-            # 將所有紙本資料存入，確保歷史紀錄完整
             new_entry = {
                 "日期": report_date.strftime("%Y-%m-%d"), "車號": car_no if car_no else "未填", 
                 "車次": trip, "司機": driver_name, "路線": route,
@@ -155,7 +168,6 @@ with tab2:
     st.subheader("📊 歷史管理與列印")
     df = load_data()
     if not df.empty:
-        # 下拉選單維持 1.2.3... 排序
         selected_indices = st.multiselect(
             "勾選列印項目 (每頁上限 5 項)：", 
             df.index, 
@@ -169,7 +181,7 @@ with tab2:
                 content = ""
                 for idx in selected_indices:
                     row = df.loc[idx]
-                    # 這裡完全保留了您要的標題靠左、右側底線日期的格式
+                    # ★ 這裡更新了標題靠左、日期靠右並帶底線的格式 ★
                     content += f"""
                     <div class='logistics-card'>
                         <div class='print-header'>
@@ -179,15 +191,16 @@ with tab2:
                         <table class='print-table'>
                             <tr><td class='header-cell'>配送：{row['路線']}</td><td class='header-cell'>車次：{row['車次']}</td><td class='header-cell'>車號：{row['車號']}</td><td class='header-cell'>噸數：{row['噸數']}</td></tr>
                             <tr><td class='header-cell'>進廠：{row['進廠']}</td><td class='header-cell'>出車：{row['出車']}</td><td class='header-cell'>大溪倉：{row['大溪倉']}</td><td class='header-cell'>岡山倉：{row['岡山倉']}</td></tr>
-                            <tr><td>時效：{row.get('時效', '')}</td><td>紅箱：____ 板</td><td>棧板：{row.get('棧板', '')}</td><td>點交日：{row['日期']}</td></tr>
+                            <tr><td>時效：{row.get('時效', '')}</td><td>紅箱：{row.get('紅箱', '')} 板</td><td>棧板：{row.get('棧板', '')}</td><td>點交日：{row['日期']}</td></tr>
                         </table>
                         <div class='sign-area'>
                             <span>運務士簽章：________________</span><span>倉別確認：________________</span>
                         </div>
                     </div>"""
                 
+                # 這次用覆蓋全域的容器生成，解決空白問題
                 st.markdown(f"<div class='print-container'>{content}</div>", unsafe_allow_html=True)
-                st.success("預覽已生成，請按 Ctrl + P 開始列印。")
+                st.success("預覽已在背景生成，請直接按鍵盤 Ctrl + P 進行列印！")
         
         st.divider()
         st.dataframe(df, use_container_width=True)
