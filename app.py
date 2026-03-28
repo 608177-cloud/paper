@@ -241,34 +241,36 @@ with tab2:
             }
         )
 
-    # --- 操作按鈕區 (修正縮排與刪除邏輯) ---
-        b1, b2 = st.columns(2)
+   # 3. 準備編輯表格：插入勾選欄位
+        # 注意：我們直接在顯示用的 DataFrame 增加欄位，不影響原始 df
+        display_df = df.copy()
+        display_df.insert(0, "🗑️刪除", False)
+        display_df.insert(1, "🖨️列印", False)
         
-     with b1:
-            if st.button("🔥 執行刪除選中項目"):
-                # 1. 直接從原本的 df 中排除掉在 edited_df 裡被勾選刪除的 index
-                # 這樣可以完全避開 "Must pass 2-d input" 的格式問題
-                try:
-                    # 找出哪些列被勾選了刪除
-                    indices_to_drop = edited_df[edited_df["🗑️刪除"] == True].index
-                    
-                    if not indices_to_drop.empty:
-                        # 2. 核心修正：直接對原始 df 進行過濾，確保格式 100% 正確
-                        # 使用 ~ 表示「不包含」，只留下沒被勾選的資料
-                        new_df = df.drop(indices_to_drop)
-                        
-                        # 3. 移除 UI 臨時欄位再存檔
-                        if "🗑️刪除" in new_df.columns: new_df = new_df.drop(columns=["🗑️刪除"])
-                        if "🖨️列印" in new_df.columns: new_df = new_df.drop(columns=["🖨️列印"])
-                        
-                        # 4. 執行存檔
-                        save_data(new_df)
-                        st.success(f"✅ 已成功刪除紀錄！")
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ 請先勾選 🗑️ 欄位")
-                except Exception as e:
-                    st.error(f"刪除失敗：{e}")
+        # 使用 data_editor 讓使用者勾選
+        edited_df = st.data_editor(
+            display_df, 
+            hide_index=True, 
+            use_container_width=True,
+            key="main_editor"
+        )
+
+        # 4. 按鈕區：使用最嚴格的對齊縮排
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("🔥 確定刪除勾選項目"):
+                # 關鍵邏輯：找出哪些 index 沒有被勾選刪除
+                # 這樣做可以 100% 避開 2-D input 報錯
+                mask = edited_df["🗑️刪除"] == False
+                new_df = df[mask.values].copy() # 只留下沒勾選刪除的列
+                
+                if len(new_df) < len(df):
+                    save_data(new_df)
+                    st.success("✅ 紀錄已成功刪除！")
+                    st.rerun()
+                else:
+                    st.warning("請先在表格最左側勾選 🗑️")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
