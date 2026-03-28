@@ -197,24 +197,71 @@ with tab2:
         for c in expected_cols:
             if c not in df.columns: df[c] = ""
 
-        # 日期篩選區
-        df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
-        sel_date = st.selectbox("📅 篩選日期", ["全部顯示"] + sorted(df['日期篩選'].unique().tolist(), reverse=True))
+        # --- 功能列：日期點選與 Excel 下載 ---
+        col_date, col_excel = st.columns([2, 1])
+        
+        with col_date:
+            # 優化 2：改為可點選的日期選擇器
+            df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
+            filter_date = st.date_input("📅 選擇篩選日期", value=None, help="點選日期進行篩選，清除則顯示全部")
         
         display_df = df.copy()
-        if sel_date != "全部顯示":
-            display_df = display_df[display_df['日期篩選'] == sel_date]
+        if filter_date:
+            display_df = display_df[display_df['日期篩選'] == filter_date]
+        
+        with col_excel:
+            # 優化 3：新增下載 Excel 功能
+            import io
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                # 這裡下載的是篩選後的結果
+                display_df.drop(columns=['日期篩選']).to_excel(writer, index=False, sheet_name='點交紀錄')
+            
+            st.download_button(
+                label="📥 下載 Excel",
+                data=buffer.getvalue(),
+                file_name=f"日翊點交紀錄_{filter_date if filter_date else '全部'}.xlsx",
+                mime="application/vnd.ms-excel"
+            )
+
         display_df = display_df.drop(columns=['日期篩選'])
 
-        # 2. 顯示編輯器：確保正確賦值給 edited_df 避免 NameError
-        display_df.insert(0, "🖨️列印", False)
+        # --- 資料編輯器 ---
+        # 優化 1：新增刪除勾選在列印左邊
+        display_df.insert(0, "🗑️刪除", False)
+        display_df.insert(1, "🖨️列印", False)
+        
         edited_df = st.data_editor(
             display_df, 
             hide_index=True, 
             use_container_width=True,
-            column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)}
+            column_config={
+                "🗑️刪除": st.column_config.CheckboxColumn("🗑️", default=False),
+                "🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)
+            }
         )
 
+        # --- 按鈕執行區 ---
+        btn_col1, btn_col2 = st.columns(2)
+        
+        with btn_col1:
+            # 刪除功能實作
+            if st.button("🔥 執行刪除勾選項目"):
+                to_delete = edited_df[edited_df["🗑️刪除"] == True]
+                if not to_delete.empty:
+                    # 根據您資料中的唯一辨識符（例如 儲存序號）進行刪除
+                    if '儲存序號' in df.columns:
+                        df = df[~df['儲存序號'].isin(to_delete['儲存序號'])]
+                    else:
+                        # 若無序號則根據 index 刪除
+                        df = df.drop(to_delete.index)
+                    
+                    # 儲存並重新整理
+                    save_data(df)
+                    st.success(f"✅ 已刪除 {len(to_delete)} 筆資料！")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ 請先勾選要刪除的項目")
       # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
         
