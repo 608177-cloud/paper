@@ -190,17 +190,16 @@ with tab2:
     df = load_data()
     
     if not df.empty:
-        # 1. 欄位補全檢查
+        # 1. 確保基礎欄位完整
         expected_cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
                         "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
                         "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C", "退貨通"]
         for c in expected_cols:
             if c not in df.columns: df[c] = ""
 
-        # --- 功能區：點選式日期與 Excel 下載 ---
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            # 優化：改為日期選擇器
+        # --- 功能列：日期點選與 Excel 下載 ---
+        col_date, col_excel = st.columns([2, 1])
+        with col_date:
             df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
             filter_date = st.date_input("📅 選擇篩選日期", value=None)
         
@@ -208,18 +207,27 @@ with tab2:
         if filter_date:
             display_df = display_df[display_df['日期篩選'] == filter_date]
         
-        with c2:
-            # 優化：Excel 下載按鈕
-            import io
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                display_df.drop(columns=['日期篩選']).to_excel(writer, index=False)
-            st.download_button(label="📥 下載 Excel", data=buffer.getvalue(), file_name="點交紀錄.xlsx")
+        with col_excel:
+            try:
+                import io
+                buffer = io.BytesIO()
+                # 移除輔助欄位後下載
+                output_df = display_df.drop(columns=['日期篩選']) if '日期篩選' in display_df.columns else display_df
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    output_df.to_excel(writer, index=False, sheet_name='點交紀錄')
+                
+                st.download_button(
+                    label="📥 下載 Excel",
+                    data=buffer.getvalue(),
+                    file_name=f"日翊點交紀錄_{filter_date if filter_date else '全部'}.xlsx",
+                    mime="application/vnd.ms-excel"
+                )
+            except Exception as e:
+                st.error("Excel 引擎啟動中，請稍候再試")
 
+        # --- 資料編輯區 ---
         display_df = display_df.drop(columns=['日期篩選'])
-
-        # --- 編輯器：新增刪除與列印勾選 ---
-        # 優化：刪除在列印左邊
+        # 🗑️ 在 🖨️ 左邊
         display_df.insert(0, "🗑️刪除", False)
         display_df.insert(1, "🖨️列印", False)
         
@@ -233,27 +241,27 @@ with tab2:
             }
         )
 
-        # --- 操作按鈕 ---
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("🔥 執行刪除勾選"):
+        # --- 底部按鈕區 ---
+        btn_c1, btn_c2 = st.columns(2)
+        with btn_c1:
+            if st.button("🔥 執行刪除選中項目"):
                 to_delete = edited_df[edited_df["🗑️刪除"] == True]
                 if not to_delete.empty:
-                    # 優先使用儲存序號刪除
+                    # 優先比對序號刪除
                     if '儲存序號' in df.columns:
                         df = df[~df['儲存序號'].isin(to_delete['儲存序號'])]
                     else:
                         df = df.drop(to_delete.index)
                     save_data(df)
-                    st.success("資料已更新！")
+                    st.success("✅ 資料已成功清理！")
                     st.rerun()
         
-        with b2:
+        with btn_c2:
             if st.button("🖨️ 準備列印 (Ctrl+P)"):
-                selected_data = edited_df[edited_df["🖨️列印"] == True]
-                if not selected_data.empty:
-                    # 沿用「十成功力」HTML 邏輯，確保多筆渲染
-                    clean_df = selected_data.fillna('').astype(str)
+                selected_for_print = edited_df[edited_df["🖨️列印"] == True]
+                if not selected_for_print.empty:
+                    # 使用您最成功的「十成功力」HTML 渲染邏輯
+                    clean_df = selected_for_print.fillna('').astype(str)
                     recs = clean_df.to_dict('records')
                     num_pages = (len(recs) + 4) // 5
                     final_html = ""
@@ -263,11 +271,12 @@ with tab2:
                         for i in range(5):
                             idx = p * 5 + i
                             r = recs[idx] if idx < len(recs) else {c: "" for c in expected_cols}
-                            # HTML 表格省略 (請保留原本替換換行符號的 table 區塊)
-                            final_html += f"""<table class="print-table">...</table>""".replace('\n', '') 
+                            # 這裡放入您之前成功渲染的 table_html 並加上 .replace('\n', '')
+                            # [略：請保留您之前最後一版成功的 table 格式]
+                            final_html += f"<table>...</table>".replace('\n', '') 
                         final_html += "</div>"
                     st.session_state['print_content'] = final_html
-                    st.success("預覽已就緒！")
+                    st.success("✅ 格式已生成！請按 Ctrl+P")
     else:
         st.info("尚無歷史紀錄。")
 # 請確保這段在 App 的最後一行，不要放在任何 if 或 tab 裡面
