@@ -141,27 +141,160 @@ with tab1:
             st.rerun()
 
 with tab2:
+    st.markdown("### 📊 歷史紀錄與管理")
     df = load_data()
+    
     if not df.empty:
-        selected = st.multiselect("勾選項目預覽列印", df.index, format_func=lambda x: f"{df.loc[x,'日期']} | {df.loc[x,'車號']}")
-        if st.button("🖨️ 生成 A4 列印格式"):
-            content = ""
-            for idx in selected:
-                r = df.loc[idx]
-                content += f"""
-                <div class='logistics-card'>
-                    <div style='display:flex; justify-content:space-between;'><b>日翊文化轉運車轉運商品點交表</b> <b>____年____月____日</b></div>
-                    <table class='print-table'>
-                        <tr class='bg-gray'><td>配送起訖</td><td>車次</td><td>車號</td><td>司機簽章</td><td>噸數</td><td>進廠</td><td>出車</td></tr>
-                        <tr><td>{r['路線']}</td><td>{r['車次']}</td><td>{r['車號']}</td><td></td><td>{r['噸數']}</td><td>{r['進廠']}</td><td>{r['出車']}</td></tr>
-                        <tr class='bg-gray'><td>大溪倉</td><td>岡山倉</td><td>時效件</td><td>特殊件</td><td>紅箱</td><td>營收袋</td><td>剩餘</td></tr>
-                        <tr><td>{r['大溪倉']}<span class='unit-label'>台/板</span></td><td>{r['岡山倉']}<span class='unit-label'>台/板</span></td><td>{r['時效']}<span class='unit-label'>台</span></td><td>{r['特殊']}<span class='unit-label'>台</span></td><td>{r['紅箱']}<span class='unit-label'>板</span></td><td>{r['營收袋']}<span class='unit-label'>箱/板</span></td><td>{r['剩餘']}<span class='unit-label'>條</span></td></tr>
-                        <tr class='bg-gray'><td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td></tr>
-                        <tr><td>{r['污衣']}<span class='unit-label'>板</span></td><td>{r['潔衣']}<span class='unit-label'>台</span></td><td>{r['舊鞋']}<span class='unit-label'>台</span></td><td>{r['咖啡']}<span class='unit-label'>板</span></td><td>0<span class='unit-label'>台</span></td><td>{r['異常']}<span class='unit-label'>板</span></td><td>{r['廠退']}<span class='unit-label'>箱</span></td></tr>
-                        <tr class='bg-gray'><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借/還貨</td><td>B2C</td></tr>
-                        <tr><td>{r['O2O']}<span class='unit-label'>台</span></td><td>{r['預購']}<span class='unit-label'>台</span></td><td>{r['調撥']}<span class='unit-label'>板/箱</span></td><td>{r['文件']}<span class='unit-label'>箱</span></td><td>{r['商品']}<span class='unit-label'>箱</span></td><td>{r['借還']}<span class='unit-label'>箱</span></td><td>{r['B2C']}<span class='unit-label'>板/台</span></td></tr>
-                    </table>
-                </div>"""
-            st.markdown(f"<div class='print-container'>{content}</div>", unsafe_allow_html=True)
-            st.info("預覽已生成，請按 Ctrl+P 列印。")
-        st.dataframe(df)
+        # --- 預防 KeyError 當機：自動補齊舊資料缺少的欄位 ---
+        expected_cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
+                        "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
+                        "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C"]
+        for c in expected_cols:
+            if c not in df.columns:
+                df[c] = ""
+
+        # --- 2. 保留日期篩選功能 ---
+        col_f1, col_f2 = st.columns([1, 3])
+        with col_f1:
+            try:
+                df['日期格式'] = pd.to_datetime(df['日期']).dt.date
+            except:
+                df['日期格式'] = df['日期']
+            
+            unique_dates = df['日期格式'].dropna().unique().tolist()
+            selected_date = st.selectbox("📅 篩選日期", ["顯示全部"] + unique_dates)
+
+        with col_f2:
+            # --- 4. 保留下載完整的 CSV 備份功能 ---
+            csv_data = df.drop(columns=['日期格式'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 下載完整 CSV 備份",
+                data=csv_data,
+                file_name="delivery_backup.csv",
+                mime="text/csv"
+            )
+
+        # 應用篩選
+        display_df = df.copy()
+        if selected_date != "顯示全部":
+            display_df = display_df[display_df['日期格式'] == selected_date]
+        display_df = display_df.drop(columns=['日期格式'], errors='ignore')
+
+        # --- 3. 紀錄表最左邊改成點選 icon ---
+        display_df.insert(0, "🖨️列印", False)
+
+        st.markdown("##### 📌 點交資料列表 (請勾選最左側『🖨️列印』，然後點擊下方按鈕生成報表)")
+        
+        # --- 1. 歷史紀錄中看到所有儲存的資料數字列表 ---
+        edited_df = st.data_editor(
+            display_df,
+            hide_index=True,
+            column_config={
+                "🖨️列印": st.column_config.CheckboxColumn("🖨️列印", help="勾選以列印此筆資料", default=False)
+            },
+            disabled=df.columns.tolist(), # 鎖定原始資料不被誤改，只能勾選第一欄
+            use_container_width=True
+        )
+
+        selected_rows = edited_df[edited_df["🖨️列印"] == True]
+
+        # --- 5. 點選後，產生與附圖一樣的 A4 表格 (1標題接5個小表格) ---
+        if not selected_rows.empty:
+            if st.button("🖨️ 產生 A4 列印報表 (對齊實體紙本 5 格格式)"):
+                records = selected_rows.to_dict('records')
+                
+                # 計算需要幾頁 (每頁印滿 5 個表格)
+                total_records = len(records)
+                pages = (total_records + 4) // 5 
+                
+                print_html = ""
+                for page in range(pages):
+                    print_html += f"""
+                    <div class="a4-page">
+                        <div class="print-header">
+                            <div class="print-title">日翊文化轉運車轉運商品點交表</div>
+                            <div class="print-date"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>
+                        </div>
+                    """
+                    
+                    # 每一頁固定產出 5 個小表格
+                    for i in range(5):
+                        record_idx = page * 5 + i
+                        if record_idx < total_records:
+                            r = records[record_idx]
+                        else:
+                            # 勾選不足 5 筆時，自動補上完全空白的表格
+                            r = {col: "" for col in expected_cols}
+                        
+                        def safe_v(key):
+                            val = r.get(key, "")
+                            return "" if pd.isna(val) else val
+
+                        # 完美對齊您照片中的 7 欄位格式
+                        print_html += f"""
+                        <table class="print-table">
+                            <tr class="header-row">
+                                <td width="14%">配送起訖</td><td width="14%">車次</td><td width="14%">車號</td><td width="14%">運務士簽章</td><td width="14%">派車噸數</td><td width="14%">進廠時間</td><td width="16%">出車時間</td>
+                            </tr>
+                            <tr>
+                                <td>{safe_v('路線')}</td><td>{safe_v('車次')}</td><td>{safe_v('車號')}</td><td></td><td>{safe_v('噸數')}</td><td>{safe_v('進廠')}</td><td>{safe_v('出車')}</td>
+                            </tr>
+                            <tr class="header-row">
+                                <td>大溪倉<br><span class="unit">0.2/1.3</span></td><td>岡山倉<br><span class="unit">5/6</span></td><td>時效件<br><span class="unit">大溪/岡山</span></td><td>特殊件<br><span class="unit">大溪/岡山</span></td><td>紅箱</td><td>營收袋</td><td>剩餘</td>
+                            </tr>
+                            <tr>
+                                <td>{safe_v('大溪倉')}</td><td>{safe_v('岡山倉')}</td><td>{safe_v('時效')}</td><td>{safe_v('特殊')}</td><td>{safe_v('紅箱')}</td><td>{safe_v('營收袋')}</td><td>{safe_v('剩餘')}</td>
+                            </tr>
+                            <tr class="header-row">
+                                <td>污衣</td><td>潔衣</td><td>舊鞋救命</td><td>咖啡豆</td><td>退貨通</td><td>異常件</td><td>廠退</td>
+                            </tr>
+                            <tr>
+                                <td>{safe_v('污衣')}</td><td>{safe_v('潔衣')}</td><td>{safe_v('舊鞋')}</td><td>{safe_v('咖啡')}</td><td>0</td><td>{safe_v('異常')}</td><td>{safe_v('廠退')}</td>
+                            </tr>
+                            <tr class="header-row">
+                                <td>O2O商品<br><span class="unit">大溪/岡山</span></td><td>預購<br><span class="unit">大溪/岡山/台東</span></td><td>跨廠調撥</td><td>重要文件<br><span class="unit">大溪/岡山</span></td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td>
+                            </tr>
+                            <tr>
+                                <td>{safe_v('O2O')}</td><td>{safe_v('預購')}</td><td>{safe_v('調撥')}</td><td>{safe_v('文件')}</td><td>{safe_v('商品')}</td><td>{safe_v('借還')}</td><td></td>
+                            </tr>
+                            <tr class="header-row">
+                                <td>龍車防水罩</td><td>藍白防水罩</td><td>棧板<br><span class="unit">黑膠/綠色/木頭</span></td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td>
+                            </tr>
+                            <tr>
+                                <td>{safe_v('龍罩')}</td><td>{safe_v('藍罩')}</td><td>{safe_v('棧板')}</td><td>{safe_v('空籃')}</td><td>{safe_v('空龍')}</td><td>{safe_v('地墊')}</td><td>{safe_v('B2C')}</td>
+                            </tr>
+                        </table>
+                        """
+                    print_html += "</div>" # 結束一頁 A4
+
+                # 注入 CSS 隱藏網頁按鈕，只顯示乾淨的列印畫面
+                st.markdown(f"""
+                <style>
+                    .print-container {{ display: none; }}
+                    @media print {{
+                        [data-testid="stSidebar"], header, .stButton, [data-testid="stForm"], .stTabs, .stMarkdown, .stSelectbox, .stDownloadButton, [data-testid="stDataFrame"] {{ display: none !important; }}
+                        
+                        .print-container {{ 
+                            display: block !important; position: absolute; top: 0; left: 0; 
+                            width: 100%; background: white; z-index: 9999; color: black;
+                            font-family: "Microsoft JhengHei", sans-serif;
+                        }}
+                        
+                        @page {{ size: A4 portrait; margin: 8mm; }}
+                        
+                        .a4-page {{ width: 100%; height: 280mm; display: flex; flex-direction: column; justify-content: flex-start; page-break-after: always; }}
+                        .print-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; font-size: 20px; }}
+                        .print-title {{ font-weight: bold; letter-spacing: 2px; }}
+                        .print-date {{ font-size: 16px; margin-bottom: 2px; }}
+                        .print-table {{ width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-bottom: 15px; table-layout: fixed; }}
+                        .print-table th, .print-table td {{ border: 1px solid #000; padding: 2px 1px; height: 22px; vertical-align: middle; overflow: hidden; }}
+                        .header-row {{ background-color: #e6e6e6 !important; font-weight: bold; -webkit-print-color-adjust: exact; }}
+                        .unit {{ font-size: 9px; font-weight: normal; }}
+                    }}
+                </style>
+                <div class="print-container">{print_html}</div>
+                """, unsafe_allow_html=True)
+                
+                st.success("✅ 版面已生成！請直接按下鍵盤 **Ctrl + P** (或右鍵選擇列印)，出現的預覽畫面就會和您的紙本 100% 相同。")
+    else:
+        st.info("目前尚無歷史紀錄。")
