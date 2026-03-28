@@ -185,82 +185,46 @@ with tab1:
             st.success("資料已成功存檔！")
             st.rerun()
 
+# --- 修正後的列印生成邏輯 ---
 with tab2:
-    st.markdown("### 📊 歷史紀錄與管理")
-    df = load_data()
+    # (前面篩選資料與編輯器的程式碼維持不變...)
+    selected_data = edited_df[edited_df["🖨️列印"] == True]
     
-    if not df.empty:
-        # 1. 確保所有預期欄位都存在，避免 KeyError
-        expected_cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
-                        "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
-                        "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C"]
-        for c in expected_cols:
-            if c not in df.columns: df[c] = ""
-
-        # 日期篩選區 (略，維持原本功能)
-        df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
-        sel_date = st.selectbox("📅 篩選日期", ["全部顯示"] + sorted(df['日期篩選'].unique().tolist(), reverse=True))
-        
-        display_df = df.copy()
-        if sel_date != "全部顯示":
-            display_df = display_df[display_df['日期篩選'] == sel_date]
-        display_df = display_df.drop(columns=['日期篩選'])
-
-        # 勾選列印功能
-        display_df.insert(0, "🖨️列印", False)
-        edited_df = st.data_editor(display_df, hide_index=True, use_container_width=True,
-                                   column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)})
-
-        selected_data = edited_df[edited_df["🖨️列印"] == True]
-        
-        if not selected_data.empty:
-            if st.button("🖨️ 生成 A4 格式預覽 (完成後按 Ctrl+P)"):
-                # 將資料轉換為字典列表，並將 NaN 轉換為空字串
-                records = selected_data.replace({np.nan: '', 'nan': ''}).to_dict('records')
-                num_pages = (len(records) + 4) // 5
+    if not selected_data.empty:
+        if st.button("🖨️ 生成 A4 格式預覽 (完成後按 Ctrl+P)"):
+            # 1. 修正 NameError：改用 fillna('') 處理空值，不需使用 np.nan
+            # 2. 確保所有欄位都轉為字串，避免格式錯誤
+            clean_df = selected_data.fillna('').astype(str)
+            records = clean_df.to_dict('records')
+            
+            num_pages = (len(records) + 4) // 5
+            html_buffer = []
+            
+            for p in range(num_pages):
+                # 每個 A4 頁面的容器
+                html_buffer.append('<div class="a4-page">')
                 
-                # 使用 list 收集 HTML 段落，最後一次 join，避免字串拼接產生的解析錯誤
-                html_buffer = []
+                # 頁首標題
+                html_buffer.append('''
+                    <div class="print-header-row">
+                        <div class="print-main-title">日翊文化轉運車轉運商品點交表</div>
+                        <div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>
+                    </div>
+                ''')
                 
-                for p in range(num_pages):
-                    html_buffer.append('<div class="a4-page">')
-                    html_buffer.append('<div class="print-header-row">')
-                    html_buffer.append('<div class="print-main-title">日翊文化轉運車轉運商品點交表</div>')
-                    html_buffer.append('<div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>')
-                    html_buffer.append('</div>')
-                    
-                    for i in range(5):
-                        idx = p * 5 + i
-                        # 如果索引超出選取範圍，產空表格
-                        r = records[idx] if idx < len(records) else {c: "" for c in expected_cols}
+                # 每一頁最多放置 5 格表格
+                for i in range(5):
+                    idx = p * 5 + i
+                    if idx < len(records):
+                        r = records[idx]
                         
-                        # 確保字典中所有值都是字串，避免顯示 None
-                        for key in r: 
-                            if r[key] is None or str(r[key]).lower() == 'nan': r[key] = ""
-
-                        # 修正後的表格 HTML (移除多餘換行，防止解析為 code block)
-                        table_html = f"""
-                        <table class="print-table">
-                            <tr class="bg-gray"><td style="width:15%">配送起訖</td><td style="width:10%">車次</td><td style="width:15%">車號</td><td style="width:15%">運務士簽章</td><td style="width:10%">噸數</td><td style="width:10%">進廠</td><td style="width:10%">出車</td></tr>
-                            <tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr>
-                            <tr class="bg-gray"><td>大溪倉(0.2/1.3)</td><td>岡山倉(5/6)</td><td>時效件</td><td>特殊件</td><td>紅箱(板)</td><td>營收袋(箱/板)</td><td>剩餘(條)</td></tr>
-                            <tr><td>{r.get('大溪倉','')}</td><td>{r.get('岡山倉','')}</td><td>{r.get('時效','')}</td><td>{r.get('特殊','')}</td><td>{r.get('紅箱','')}</td><td>{r.get('營收袋','')}</td><td>{r.get('剩餘','')}</td></tr>
-                            <tr class="bg-gray"><td>污衣(板)</td><td>潔衣(台)</td><td>舊鞋救命</td><td>咖啡豆</td><td>廠退</td><td>異常件</td><td>備註</td></tr>
-                            <tr><td>{r.get('污衣','')}</td><td>{r.get('潔衣','')}</td><td>{r.get('舊鞋','')}</td><td>{r.get('咖啡','')}</td><td>{r.get('廠退','')}</td><td>{r.get('異常','')}</td><td></td></tr>
-                            <tr class="bg-gray"><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td></tr>
-                            <tr><td>{r.get('O2O','')}</td><td>{r.get('預購','')}</td><td>{r.get('調撥','')}</td><td>{r.get('文件','')}</td><td>{r.get('商品','')}</td><td>{r.get('借還','')}</td><td></td></tr>
-                            <tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr>
-                            <tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr>
-                        </table>
-                        """
+                        # 生成單個表格 HTML
+                        # 關鍵：移除所有內部的換行符，防止 Streamlit 誤判為 Markdown 程式碼區塊
+                        table_html = f"""<table class="print-table"><tr class="bg-gray"><td style="width:15%">配送起訖</td><td style="width:10%">車次</td><td style="width:15%">車號</td><td style="width:15%">運務士簽章</td><td style="width:10%">噸數</td><td style="width:10%">進廠</td><td style="width:10%">出車</td></tr><tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr><tr class="bg-gray"><td>大溪倉(0.2/1.3)</td><td>岡山倉(5/6)</td><td>時效件</td><td>特殊件</td><td>紅箱(板)</td><td>營收袋(箱/板)</td><td>剩餘(條)</td></tr><tr><td>{r.get('大溪倉','')}</td><td>{r.get('岡山倉','')}</td><td>{r.get('時效','')}</td><td>{r.get('特殊','')}</td><td>{r.get('紅箱','')}</td><td>{r.get('營收袋','')}</td><td>{r.get('剩餘','')}</td></tr><tr class="bg-gray"><td>污衣(板)</td><td>潔衣(台)</td><td>舊鞋救命</td><td>咖啡豆</td><td>廠退</td><td>異常件</td><td>備註</td></tr><tr><td>{r.get('污衣','')}</td><td>{r.get('潔衣','')}</td><td>{r.get('舊鞋','')}</td><td>{r.get('咖啡','')}</td><td>{r.get('廠退','')}</td><td>{r.get('異常','')}</td><td></td></tr><tr class="bg-gray"><td>O2O商品</td><td>預購</td><td>跨廠調撥</td><td>重要文件</td><td>重要商品</td><td>借貨商品</td><td>還貨商品</td></tr><tr><td>{r.get('O2O','')}</td><td>{r.get('預購','')}</td><td>{r.get('調撥','')}</td><td>{r.get('文件','')}</td><td>{r.get('商品','')}</td><td>{r.get('借還','')}</td><td></td></tr><tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr><tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr></table>"""
                         html_buffer.append(table_html)
-                    
-                    html_buffer.append("</div>")
                 
-                # 關鍵修正：將所有 HTML 組合為單一不換行的字串，存入 Session
-                st.session_state['print_content'] = "".join(html_buffer)
-                st.success("✅ 列印預覽已備妥。請按下 Ctrl + P 並將「比例」設定為「實際大小」或 100%。")
-
-# --- 最後在 App 最外層顯示 (與上次相同) ---
-if 'print_content' in st.session_state:
-    st.markdown(f'<div class="print-area">{st.session_state["print_content"]}</div>', unsafe_allow_html=True)
+                html_buffer.append('</div>') # 結束 a4-page
+            
+            # 將所有內容組合為單一 HTML 字串
+            st.session_state['print_content'] = "".join(html_buffer)
+            st.success("✅ 列印預覽已備妥。")
