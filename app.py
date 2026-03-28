@@ -4,9 +4,9 @@ from datetime import datetime
 import os
 
 # --- 1. 頁面基本配置 ---
-st.set_page_config(page_title="日翊文化點交系統-同步版", layout="wide")
+st.set_page_config(page_title="日翊文化點交系統-完整同步版", layout="wide")
 
-# --- 2. 資料持久化邏輯 (解決不同步與即時查詢問題) ---
+# --- 2. 資料持久化邏輯 (多人同步與刪除功能) ---
 DB_FILE = "delivery_data.csv"
 
 def load_data():
@@ -21,6 +21,14 @@ def save_data(new_dict):
     df.to_csv(DB_FILE, index=False)
     return df
 
+def delete_data(index_to_delete):
+    df = load_data()
+    if not df.empty:
+        df = df.drop(index_to_delete).reset_index(drop=True)
+        df.to_csv(DB_FILE, index=False)
+        return True
+    return False
+
 # --- 3. CSS 樣式 (保留原有設計) ---
 st.markdown("""
     <style>
@@ -30,9 +38,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='report-title'>🚚 日翊文化轉運車轉運商品點交表 (多人同步版)</div>", unsafe_allow_html=True)
+st.markdown("<div class='report-title'>🚚 日翊文化轉運車轉運商品點交表 (多人同步刪除版)</div>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📝 新增點交單", "📊 歷史紀錄與搜尋"])
+tab1, tab2 = st.tabs(["📝 新增點交單", "📊 歷史紀錄與管理"])
 
 with tab1:
     with st.form("full_delivery_form", clear_on_submit=True):
@@ -113,39 +121,49 @@ with tab1:
 
         if submit:
             new_entry = {
-                "儲存時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "儲存序號": datetime.now().strftime("%Y%m%d%H%M%S"),
                 "日期": report_date.strftime("%Y-%m-%d"),
                 "車號": car_no, "車次": trip, "司機": driver_name, "路線": route,
                 "大溪倉": f"{dx_item}:{dx_val}", "岡山倉": f"{ok_item}:{ok_val}",
                 "進廠": in_time.strftime("%H:%M"), "出車": out_time.strftime("%H:%M")
             }
             save_data(new_entry)
-            st.success(f"資料已寫入檔案！{car_no} 儲存成功。")
-            st.rerun() # 儲存後自動重新整理讀取最新資料
+            st.success(f"資料儲存成功！")
+            st.rerun()
 
 with tab2:
-    st.subheader("🔍 歷史資料查詢")
+    st.subheader("🔍 歷史資料查詢與管理")
     current_df = load_data()
     
     if not current_df.empty:
-        # 搜尋篩選器
+        # 搜尋篩選
         col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            search_car = st.text_input("輸入車號關鍵字搜尋")
-        with col_s2:
-            search_date = st.date_input("選擇日期篩選", value=None)
+        with col_s1: search_car = st.text_input("輸入車號搜尋")
+        with col_s2: search_date = st.date_input("選擇日期篩選", value=None)
         
-        # 執行篩選
         filtered_df = current_df.copy()
         if search_car:
             filtered_df = filtered_df[filtered_df["車號"].str.contains(search_car, na=False)]
         if search_date:
             filtered_df = filtered_df[filtered_df["日期"] == search_date.strftime("%Y-%m-%d")]
         
-        st.write(f"找到 {len(filtered_df)} 筆紀錄")
-        st.dataframe(filtered_df.sort_values(by="儲存時間", ascending=False), use_container_width=True)
+        # 顯示資料並提供刪除功能
+        st.write(f"共 {len(filtered_df)} 筆紀錄")
         
-        # 匯出按鈕
-        st.download_button("📥 下載完整 CSV 資料備份", current_df.to_csv(index=False).encode('utf-8-sig'), "history_data.csv", "text/csv")
+        for index, row in filtered_df.sort_index(ascending=False).iterrows():
+            with st.expander(f"📅 {row['日期']} | 🚛 車號: {row['車號']} | 👤 司機: {row['司機']}"):
+                col_info, col_del = st.columns([4, 1])
+                with col_info:
+                    st.write(f"**路線**: {row['路線']} | **車次**: {row['車次']}")
+                    st.write(f"**大溪**: {row['大溪倉']} | **岡山**: {row['岡山倉']}")
+                    st.write(f"**時間**: {row['進廠']} 進 / {row['出車']} 出")
+                with col_del:
+                    if st.button(f"🗑️ 刪除", key=f"del_{index}"):
+                        if delete_data(index):
+                            st.warning("資料已刪除")
+                            st.rerun()
+        
+        st.divider()
+        st.download_button("📥 下載完整 CSV 備份", current_df.to_csv(index=False).encode('utf-8-sig'), "history.data.csv", "text/csv")
     else:
         st.info("資料庫目前是空的。")
