@@ -249,33 +249,43 @@ with tab2:
         )
 
     # --- 刪除功能修正版 ---
-        col_btn1, col_btn2 = st.columns(2)
+       b1, b2 = st.columns(2)
         
-        with col_btn1:
+        with b1:
             if st.button("🔥 確定執行刪除"):
                 try:
-                    # 1. 找出哪些列「沒有」被勾選刪除 (我們要保留的)
-                    # 使用 .values 確保布林判斷準確
-                    keep_mask = edited_df["🗑️刪除"] == False
+                    # 1. 找出被勾選要「刪除」的資料列
+                    to_delete = edited_df[edited_df["🗑️刪除"] == True]
                     
-                    # 2. 篩選出要留下的資料，這能徹底避開 2-D input 報錯
-                    new_df = df[keep_mask.values].copy()
-                    
-                    if len(new_df) < len(df):
-                        # 3. 準備存檔：移除 UI 臨時欄位
-                        # 這裡直接執行存檔，跳過可能損壞的 save_data 函式
-                        final_to_save = new_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
+                    if not to_delete.empty:
+                        # 2. 核心邏輯：從原始 df 中排除掉這些資料
+                        # 我們使用合併後排除的方式，這比 index 更精準
+                        # 假設您的資料有 '日期' 和 '車號' 作為唯一識別
+                        keys = ['日期', '車號', '車次'] 
                         
-                        # 4. 直接寫入 Excel (請確認檔名正確)
-                        final_to_save.to_excel("data.xlsx", index=False) 
+                        # 確保欄位存在於資料中
+                        available_keys = [k for k in keys if k in df.columns]
                         
-                        st.success(f"✅ 刪除成功！已移除 {len(df) - len(new_df)} 筆紀錄")
+                        # 執行排除：保留不在 to_delete 裡的資料
+                        # 這能徹底解決 ValueError: Must pass 2-d input
+                        new_df = df.set_index(available_keys).drop(
+                            to_delete.set_index(available_keys).index, 
+                            errors='ignore'
+                        ).reset_index()
+
+                        # 3. 移除臨時欄位並強制寫入檔案
+                        final_save = new_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
+                        
+                        # ⚠️ 請確保這裡的檔名與您讀取時一致
+                        final_save.to_excel("data.xlsx", index=False)
+                        
+                        st.success(f"✅ 已成功移除 {len(to_delete)} 筆紀錄！")
                         st.rerun() 
                     else:
-                        st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位")
+                        st.warning("⚠️ 請先勾選左側 🗑️ 欄位")
                 except Exception as e:
-                    # 如果點擊沒反應，這裡會抓出具體原因 (例如：檔案被 Excel 開啟中)
-                    st.error(f"❌ 刪除失敗，錯誤原因：{e}")
+                    # 捕捉隱藏的錯誤 (例如檔案被 Excel 鎖定)
+                    st.error(f"執行失敗：{e}")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
