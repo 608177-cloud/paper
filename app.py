@@ -244,31 +244,31 @@ with tab2:
     # --- 操作按鈕區 (修正縮排與刪除邏輯) ---
         b1, b2 = st.columns(2)
         
-      with b1:
+     with b1:
             if st.button("🔥 執行刪除選中項目"):
-                # 1. 取得編輯後的完整資料
-                # 2. 篩選出「沒有」被勾選刪除的資料 (我們要留下來的部分)
-                keep_df = edited_df[edited_df["🗑️刪除"] == False].copy()
-                
-                # 檢查是否有資料被勾選刪除
-                if len(keep_df) < len(edited_df):
-                    try:
-                        # 3. 關鍵修正：移除 UI 用的勾選欄位，並確保 index 重設
-                        # 這可以解決 "Must pass 2-d input" 的問題，確保傳入的是純資料表格
-                        final_to_save = keep_df.drop(columns=["🗑️刪除", "🖨️列印"], errors='ignore')
-                        final_to_save = final_to_save.reset_index(drop=True)
+                # 1. 直接從原本的 df 中排除掉在 edited_df 裡被勾選刪除的 index
+                # 這樣可以完全避開 "Must pass 2-d input" 的格式問題
+                try:
+                    # 找出哪些列被勾選了刪除
+                    indices_to_drop = edited_df[edited_df["🗑️刪除"] == True].index
+                    
+                    if not indices_to_drop.empty:
+                        # 2. 核心修正：直接對原始 df 進行過濾，確保格式 100% 正確
+                        # 使用 ~ 表示「不包含」，只留下沒被勾選的資料
+                        new_df = df.drop(indices_to_drop)
                         
-                        # 4. 呼叫存檔函式
-                        save_data(final_to_save)
+                        # 3. 移除 UI 臨時欄位再存檔
+                        if "🗑️刪除" in new_df.columns: new_df = new_df.drop(columns=["🗑️刪除"])
+                        if "🖨️列印" in new_df.columns: new_df = new_df.drop(columns=["🖨️列印"])
                         
-                        st.success(f"✅ 已成功刪除 {len(edited_df) - len(keep_df)} 筆紀錄！")
-                        # 5. 強制重整頁面以顯示最新狀態
+                        # 4. 執行存檔
+                        save_data(new_df)
+                        st.success(f"✅ 已成功刪除紀錄！")
                         st.rerun()
-                    except Exception as e:
-                        # 捕捉具體錯誤原因方便除錯
-                        st.error(f"存檔執行失敗，原因：{e}")
-                else:
-                    st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位再執行。")
+                    else:
+                        st.warning("⚠️ 請先勾選 🗑️ 欄位")
+                except Exception as e:
+                    st.error(f"刪除失敗：{e}")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
