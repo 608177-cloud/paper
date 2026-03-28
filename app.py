@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 
 # --- 1. 頁面基本配置 ---
-st.set_page_config(page_title="日翊文化點交系統-全欄位修復版", layout="wide")
+st.set_page_config(page_title="日翊文化點交系統-100%還原版", layout="wide")
 
 # --- 2. 資料持久化邏輯 ---
 DB_FILE = "delivery_data_final.csv"
@@ -12,7 +12,7 @@ DB_FILE = "delivery_data_final.csv"
 def load_data():
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE)
-        return df.sort_index(ascending=True) # 維持 1.2.3... 排序
+        return df.sort_index(ascending=True)
     return pd.DataFrame()
 
 def save_data(new_dict):
@@ -30,36 +30,52 @@ def delete_data(index_to_delete):
         return True
     return False
 
-# --- 3. CSS 列印控制：精確 A4 一頁五格與標題格式 ---
+# --- 3. CSS 列印控制：精確還原紙本 7 欄位佈局 ---
 st.markdown("""
     <style>
     .print-container { display: none; }
+    
     @media print {
+        /* 隱藏 UI，但保留容器空間 */
         [data-testid="stSidebar"], [data-testid="stHeader"], .stButton, .no-print, [data-testid="stForm"], [data-testid="stTabs"] {
             display: none !important;
         }
+        
         @page { size: A4; margin: 0.5cm; }
-        .print-container { display: block !important; }
-        .logistics-card {
-            width: 100%; height: 5.4cm; border: 2px solid black;
-            margin-bottom: 0.2cm; padding: 8px; font-size: 10px;
-            page-break-inside: avoid; box-sizing: border-box;
-            position: relative;
+        
+        .print-container { 
+            display: block !important; 
+            position: absolute; top: 0; left: 0; width: 100%; background: white; z-index: 99;
         }
-        .print-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; }
-        .print-title { font-size: 16px; font-weight: bold; }
-        .print-date-field { font-size: 14px; }
-        .print-table { width: 100%; border-collapse: collapse; }
-        .print-table td { border: 1px solid black; text-align: center; padding: 2px; }
-        .header-cell { background-color: #eeeeee !important; font-weight: bold; }
-        .sign-area { margin-top: 15px; display: flex; justify-content: space-between; }
+        
+        .logistics-card {
+            width: 100%; border: 1.5px solid black;
+            margin-bottom: 8px; padding: 5px; box-sizing: border-box;
+            font-family: "Microsoft JhengHei", sans-serif;
+            page-break-inside: avoid;
+        }
+        
+        .print-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2px; }
+        .print-title { font-size: 18px; font-weight: bold; }
+        .print-date-field { font-size: 14px; font-weight: bold; }
+        
+        .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .print-table td { 
+            border: 1px solid black; text-align: center; 
+            font-size: 10px; padding: 2px; height: 18px; 
+        }
+        .bg-gray { background-color: #f0f0f0 !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+        .unit-label { font-size: 8px; border-top: 0.5px solid #ccc; display: block; margin-top: 1px; }
+        
+        .sign-area { margin-top: 5px; display: flex; justify-content: space-between; font-size: 12px; }
     }
+    
     .report-title { font-size: 26px; font-weight: bold; text-align: center; color: #1E3A8A; }
     .section-head { background-color: #F3F4F6; padding: 2px 10px; border-left: 5px solid #3B82F6; font-weight: bold; margin-top: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='report-title'>🚚 日翊文化點交系統 (全欄位完整版)</div>", unsafe_allow_html=True)
+st.markdown("<div class='report-title'>🚚 日翊文化點交系統 (100% 還原版)</div>", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["📝 新增點交單", "📂 歷史與列印"])
 
@@ -89,13 +105,10 @@ with tab1:
             ok_item = st.selectbox("岡山倉(5/6)", ["無", "5", "6", "板", "箱"])
             ok_val = st.number_input("岡山數量", 0)
         with cx3:
-            fast_loc = st.multiselect("時效件地區", ["大溪", "岡山"])
             fast_val = st.number_input("時效件(台)", 0)
         with cx4:
-            spec_loc = st.multiselect("特殊件地區", ["大溪", "岡山"])
             spec_val = st.number_input("特殊件(台)", 0)
 
-        # 這裡補齊之前遺失的「第三區」與「第四區」紙本欄位
         st.markdown("<div class='section-head'>三、詳細商品明細</div>", unsafe_allow_html=True)
         r1, r2, r3, r4 = st.columns(4)
         with r1:
@@ -137,25 +150,27 @@ with tab1:
         st.write("---")
         submit = st.form_submit_button("✅ 儲存資料")
         if submit:
-            # 將所有紙本資料存入，確保歷史紀錄完整
             new_entry = {
                 "日期": report_date.strftime("%Y-%m-%d"), "車號": car_no if car_no else "未填", 
                 "車次": trip, "司機": driver_name, "路線": route,
-                "大溪倉": f"{dx_item}:{dx_val}", "岡山倉": f"{ok_item}:{ok_val}", 
+                "大溪倉": dx_val, "岡山倉": ok_qty if 'ok_qty' in locals() else ok_val, # 防止變數遺失
                 "進廠": in_time.strftime("%H:%M"), "出車": out_time.strftime("%H:%M"), 
-                "噸數": tonnage, "時效": fast_val, "棧板": f"{pallet_type}:{pallet_val}",
-                "紅箱": red_box, "營收袋": money_bag, "剩餘": remain, "污衣": dirty_clothes, 
-                "潔衣": clean_clothes, "咖啡豆": coffee
+                "噸數": tonnage, "時效": fast_val, "特殊": spec_val, "紅箱": red_box,
+                "營收袋": money_bag, "剩餘": remain, "污衣": dirty_clothes, "潔衣": clean_clothes,
+                "舊鞋": shoes, "咖啡": coffee, "退貨通": return_tong, "O2O": o2o_val,
+                "預購": pre_order, "調撥": trans_fac, "重文": imp_doc, "重商": imp_goods,
+                "龍罩": wp_cage, "藍罩": wp_bw, "棧板": f"{pallet_type}:{pallet_val}",
+                "空籃": basket, "空龍": empty_cage, "地墊": ground_pad, "書籍": b2c_books,
+                "異常": abnormal, "借還": borrow_goods, "廠退": factory_back
             }
             save_data(new_entry)
-            st.success("資料已成功儲存！請至「歷史與列印」分頁查看。")
+            st.success("資料已成功儲存！")
             st.rerun()
 
 with tab2:
     st.subheader("📊 歷史管理與列印")
     df = load_data()
     if not df.empty:
-        # 下拉選單維持 1.2.3... 排序
         selected_indices = st.multiselect(
             "勾選列印項目 (每頁上限 5 項)：", 
             df.index, 
@@ -169,7 +184,7 @@ with tab2:
                 content = ""
                 for idx in selected_indices:
                     row = df.loc[idx]
-                    # 這裡完全保留了您要的標題靠左、右側底線日期的格式
+                    # 100% 還原紙本 7 欄位佈局
                     content += f"""
                     <div class='logistics-card'>
                         <div class='print-header'>
@@ -177,17 +192,41 @@ with tab2:
                             <div class='print-date-field'>____年____月___日</div>
                         </div>
                         <table class='print-table'>
-                            <tr><td class='header-cell'>配送：{row['路線']}</td><td class='header-cell'>車次：{row['車次']}</td><td class='header-cell'>車號：{row['車號']}</td><td class='header-cell'>噸數：{row['噸數']}</td></tr>
-                            <tr><td class='header-cell'>進廠：{row['進廠']}</td><td class='header-cell'>出車：{row['出車']}</td><td class='header-cell'>大溪倉：{row['大溪倉']}</td><td class='header-cell'>岡山倉：{row['岡山倉']}</td></tr>
-                            <tr><td>時效：{row.get('時效', '')}</td><td>紅箱：____ 板</td><td>棧板：{row.get('棧板', '')}</td><td>點交日：{row['日期']}</td></tr>
+                            <tr>
+                                <td class='bg-gray'>配送起訖</td><td class='bg-gray'>車次</td><td class='bg-gray'>車號</td><td class='bg-gray'>運務士簽章</td><td class='bg-gray'>派車噸數</td><td class='bg-gray'>進廠時間</td><td class='bg-gray'>出車時間</td>
+                            </tr>
+                            <tr>
+                                <td>{row['路線']}</td><td>{row['車次']}</td><td>{row['車號']}</td><td></td><td>{row['噸數']}</td><td>{row['進廠']}</td><td>{row['出車']}</td>
+                            </tr>
+                            <tr>
+                                <td class='bg-gray'>大溪倉</td><td class='bg-gray'>岡山倉</td><td class='bg-gray'>時效件</td><td class='bg-gray'>特殊件</td><td class='bg-gray'>紅箱</td><td class='bg-gray'>營收袋</td><td class='bg-gray'>剩餘</td>
+                            </tr>
+                            <tr>
+                                <td>{row['大溪倉']}<span class='unit-label'>台/板</span></td><td>{row['岡山倉']}<span class='unit-label'>台/板</span></td><td>{row['時效']}<span class='unit-label'>台</span></td><td>{row['特殊']}<span class='unit-label'>台</span></td><td>{row['紅箱']}<span class='unit-label'>板</span></td><td>{row['營收袋']}<span class='unit-label'>箱/板</span></td><td>{row['剩餘']}<span class='unit-label'>條</span></td>
+                            </tr>
+                            <tr>
+                                <td class='bg-gray'>污衣</td><td class='bg-gray'>潔衣</td><td class='bg-gray'>舊鞋救命</td><td class='bg-gray'>咖啡豆</td><td class='bg-gray'>退貨通</td><td class='bg-gray'>異常件</td><td class='bg-gray'>廠退</td>
+                            </tr>
+                            <tr>
+                                <td>{row['污衣']}<span class='unit-label'>板</span></td><td>{row['潔衣']}<span class='unit-label'>台</span></td><td>{row['舊鞋']}<span class='unit-label'>台</span></td><td>{row['咖啡']}<span class='unit-label'>板</span></td><td>{row['退貨通']}<span class='unit-label'>台</span></td><td>{row['異常']}<span class='unit-label'>板</span></td><td>{row['廠退']}<span class='unit-label'>箱</span></td>
+                            </tr>
+                            <tr>
+                                <td class='bg-gray'>O2O商品</td><td class='bg-gray'>預購</td><td class='bg-gray'>跨廠調撥</td><td class='bg-gray'>重要文件</td><td class='bg-gray'>重要商品</td><td class='bg-gray'>借貨商品</td><td class='bg-gray'>還貨商品</td>
+                            </tr>
+                            <tr>
+                                <td>{row['O2O']}<span class='unit-label'>台</span></td><td>{row['預購']}<span class='unit-label'>台</span></td><td>{row['調撥']}<span class='unit-label'>板/箱</span></td><td>{row['重文']}<span class='unit-label'>箱</span></td><td>{row['重商']}<span class='unit-label'>箱</span></td><td>{row['借還']}<span class='unit-label'>箱</span></td><td>{row['借還']}<span class='unit-label'>箱</span></td>
+                            </tr>
+                            <tr>
+                                <td class='bg-gray'>龍車防水罩</td><td class='bg-gray'>藍白防水罩</td><td class='bg-gray'>棧板</td><td class='bg-gray'>空籃</td><td class='bg-gray'>空龍車</td><td class='bg-gray'>地墊/大小藍</td><td class='bg-gray'>書籍退/B2C</td>
+                            </tr>
+                            <tr>
+                                <td>{row['龍罩']}<span class='unit-label'>台</span></td><td>{row['藍罩']}<span class='unit-label'>台</span></td><td>{row['棧板']}<span class='unit-label'>落</span></td><td>{row['空籃']}<span class='unit-label'>板</span></td><td>{row['空龍']}<span class='unit-label'>組</span></td><td>{row['地墊']}<span class='unit-label'>板</span></td><td>{row['書籍']}<span class='unit-label'>板/台</span></td>
+                            </tr>
                         </table>
-                        <div class='sign-area'>
-                            <span>運務士簽章：________________</span><span>倉別確認：________________</span>
-                        </div>
                     </div>"""
                 
                 st.markdown(f"<div class='print-container'>{content}</div>", unsafe_allow_html=True)
-                st.success("預覽已生成，請按 Ctrl + P 開始列印。")
+                st.success("預覽已在下方生成。請按 Ctrl + P 開啟系統列印視窗，並確認列印內容。")
         
         st.divider()
         st.dataframe(df, use_container_width=True)
