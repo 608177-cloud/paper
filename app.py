@@ -215,33 +215,30 @@ with tab2:
             column_config={"🖨️列印": st.column_config.CheckboxColumn("🖨️", default=False)}
         )
 
-        # 3. 生成列印內容
+        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
         
         if not selected_data.empty:
             if st.button("🖨️ 準備列印 (完成後請按 Ctrl+P)"):
-                # 修正 nan 問題：不使用 np.nan 避免錯誤
+                # 修正 nan 造成的亂碼問題
                 clean_df = selected_data.fillna('').astype(str)
                 records = clean_df.to_dict('records')
                 
+                # 每頁上限 5 筆資料
                 num_pages = (len(records) + 4) // 5
                 final_html = ""
                 
                 for p in range(num_pages):
-                    # A4 分頁容器
                     final_html += '<div class="a4-page">'
-                    # 標題與日期列
-                    final_html += '<div class="print-header-row">'
-                    final_html += '<div class="print-main-title">日翊文化轉運車轉運商品點交表</div>'
-                    final_html += '<div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div>'
-                    final_html += '</div>'
+                    # 標題與手寫日期列
+                    final_html += '<div class="print-header-row"><div class="print-main-title">日翊文化轉運車轉運商品點交表</div><div class="print-date-line"><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>年<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>月<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>日</div></div>'
                     
                     for i in range(5):
                         idx = p * 5 + i
                         r = records[idx] if idx < len(records) else {c: "" for c in expected_cols}
                         
-                        # 4. 恢復精準的表格佈局
-                        final_html += f"""
+                        # 關鍵修正：將 HTML 寫成單行字串，移除換行符防止渲染失敗
+                        table_html = f"""
                         <table class="print-table">
                             <tr class="bg-gray"><td>配送起訖</td><td>車次</td><td>車號</td><td>運務士簽章</td><td>噸數</td><td>進廠</td><td>出車</td></tr>
                             <tr><td>{r.get('路線','')}</td><td>{r.get('車次','')}</td><td>{r.get('車號','')}</td><td></td><td>{r.get('噸數','')}</td><td>{r.get('進廠','')}</td><td>{r.get('出車','')}</td></tr>
@@ -254,11 +251,14 @@ with tab2:
                             <tr class="bg-gray"><td>龍車防水罩</td><td>藍白防水罩</td><td>棧板</td><td>空籃</td><td>空龍車</td><td>地墊/大小藍</td><td>書籍退/B2C</td></tr>
                             <tr><td>{r.get('龍罩','')}</td><td>{r.get('藍罩','')}</td><td>{r.get('棧板','')}</td><td>{r.get('空籃','')}</td><td>{r.get('空龍','')}</td><td>{r.get('地墊','')}</td><td>{r.get('B2C','')}</td></tr>
                         </table>
-                        """
+                        """.replace('\n', '').replace('    ', '') # 這裡移除所有換行與縮排
+                        
+                        final_html += table_html
                     final_html += "</div>"
                 
+                # 存入 Session 並強制重新渲染
                 st.session_state['print_content'] = final_html
-                st.success("✅ 格式已生成！請直接按下 Ctrl + P。")
+                st.success("✅ 格式已生成 (支援多筆)！請按下 Ctrl + P。")
     else:
         st.info("尚無歷史紀錄。")
 # 請確保這段在 App 的最後一行，不要放在任何 if 或 tab 裡面
