@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
-import pytz # 確保時區正確
+import pytz
 
-# --- 0. 時區設定 ---
+# --- 0. 時區設定 (解決日期卡在舊日期的問題) ---
 tw_tz = pytz.timezone('Asia/Taipei')
 now_tw = datetime.now(tw_tz)
 
@@ -14,53 +14,36 @@ st.set_page_config(page_title="日翊文化點交系統-完整同步版", layout
 # --- 2. 強化列印樣式 ---
 st.markdown("""
     <style>
-    /* 網頁顯示用標題 */
     .report-title { font-size: 28px; font-weight: bold; text-align: center; color: #1E3A8A; margin-bottom: 20px; }
     .section-head { background-color: #F3F4F6; padding: 5px 10px; border-left: 5px solid #3B82F6; font-weight: bold; margin-top: 15px; }
-    
-    /* 平常在網頁上隱藏列印內容 */
     .print-area { display: none; }
-
     @media print {
         header, footer, [data-testid="stSidebar"], .stTabs, .stButton, 
         .stDownloadButton, [data-testid="stDataEditor"], .report-title, 
         [data-testid="stHeader"], .stSelectbox, .stAlert { 
             display: none !important; 
         }
-        
         .print-area { 
             display: block !important; 
             position: absolute; top: 0; left: 0; width: 100%; 
             background: white !important; color: black !important;
             font-family: "Microsoft JhengHei", sans-serif;
         }
-
         @page { size: A4 portrait; margin: 10mm 8mm; }
-        .a4-page { width: 100%; page-break-after: always; }
-        
-        .print-header-row { 
-            display: flex; justify-content: space-between; align-items: flex-end; 
-            margin-bottom: 10px; width: 100%;
-        }
-        .print-main-title { font-size: 22px; font-weight: bold; }
-        .print-date-line { font-size: 16px; }
-        
         .print-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-bottom: 12px; table-layout: fixed; }
         .print-table td { border: 1px solid black; height: 22px; padding: 2px; }
         .bg-gray { background-color: #eeeeee !important; font-weight: bold; -webkit-print-color-adjust: exact; }
-        .unit-text { font-size: 8px; font-weight: normal; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 資料持久化邏輯 (修正同步存檔問題) ---
+# --- 3. 資料持久化邏輯 (修正同步與存檔錯誤) ---
 DB_FILE = "delivery_data.csv"
 
 def load_data():
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # 確保基礎欄位完整，防止因檔案欄位不全導致報錯
             cols = ["日期", "車號", "車次", "司機", "路線", "噸數", "大溪倉", "岡山倉", "進廠", "出車", 
                     "紅箱", "營收袋", "污衣", "潔衣", "剩餘", "舊鞋", "廠退", "咖啡", "棧板", "空籃", 
                     "空龍", "地墊", "龍罩", "藍罩", "時效", "特殊", "O2O", "預購", "調撥", "文件", "商品", "異常", "借還", "B2C"]
@@ -73,40 +56,18 @@ def load_data():
     return pd.DataFrame()
 
 def save_data(data):
-    # 如果傳入的是單筆字典（新增點交單）
     if isinstance(data, dict):
         df_existing = load_data()
+        # 修正 ValueError: 使用列表包裝字典確保為 2D 結構
         new_row = pd.DataFrame([data])
         df_to_save = pd.concat([df_existing, new_row], ignore_index=True)
-    # 如果傳入的是 DataFrame（刪除/編輯後的完整表格）
     else:
         df_to_save = data
         
-    # 確保存檔時不會帶入臨時勾選欄位
+    # 移除 UI 專用臨時欄位
     df_to_save = df_to_save.drop(columns=["🗑️刪除", "🖨️列印", "日期篩選"], errors='ignore')
-    
-    # 實際執行存檔：採用 utf-8-sig 格式確保 Excel 開啟不亂碼
+    # 存檔時使用 utf-8-sig 確保 Excel 中文不亂碼
     df_to_save.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
-
-# --- 4. CSS 樣式 (保留您的設計) ---
-st.markdown("""
-    <style>
-    .report-title { font-size: 28px; font-weight: bold; text-align: center; color: #1E3A8A; margin-bottom: 20px; }
-    .section-head { background-color: #F3F4F6; padding: 5px 10px; border-left: 5px solid #3B82F6; font-weight: bold; margin-top: 15px; }
-    
-    .print-container { display: none; }
-    @media print {
-        [data-testid="stSidebar"], header, .stButton, [data-testid="stForm"], .stTabs { display: none !important; }
-        .print-container { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background: white; z-index: 999; }
-        @page { size: A4; margin: 0.5cm; }
-        .logistics-card { width: 100%; border: 2px solid black; margin-bottom: 15px; padding: 5px; box-sizing: border-box; }
-        .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .print-table td { border: 1px solid black; text-align: center; font-size: 11px; padding: 2px; height: 22px; }
-        .bg-gray { background-color: #eeeeee !important; font-weight: bold; -webkit-print-color-adjust: exact; }
-        .unit-label { font-size: 9px; border-top: 0.5px solid #ccc; display: block; }
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 st.markdown("<div class='report-title'>🚚 日翊文化轉運車點交表 (多人同步完整版)</div>", unsafe_allow_html=True)
 
@@ -117,7 +78,6 @@ with tab1:
         st.markdown("<div class='section-head'>一、基本配送資料</div>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            # 修正日期：預設使用台灣時間當下的日期
             report_date = st.date_input("點交日期", now_tw.date())
             route = st.selectbox("配送起訖", ["大肚 -> 大溪", "大肚 -> 岡山", "大溪 -> 岡山", "其他"])
         with c2:
@@ -127,7 +87,6 @@ with tab1:
             tonnage = st.radio("派車噸數", ["46噸", "17噸"], horizontal=True)
             driver_name = st.text_input("運務士姓名")
         with c4:
-            # 修正時間：預設使用台灣當下時間
             in_time = st.time_input("進廠時間", now_tw.time())
             out_time = st.time_input("出車時間", now_tw.time())
 
@@ -207,7 +166,6 @@ with tab2:
     df = load_data()
     
     if not df.empty:
-        # --- 功能列：日期點選與 Excel 下載 ---
         col_date, col_excel = st.columns([2, 1])
         with col_date:
             df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
@@ -231,8 +189,8 @@ with tab2:
                     file_name=f"日翊點交紀錄_{filter_date if filter_date else '全部'}.xlsx",
                     mime="application/vnd.ms-excel"
                 )
-            except Exception as e:
-                st.error("Excel 引擎啟動中，請稍候再試")
+            except:
+                st.error("Excel 引擎啟動中...")
 
         # --- 資料編輯區 ---
         display_df = display_df.drop(columns=['日期篩選'], errors='ignore')
@@ -249,9 +207,8 @@ with tab2:
             }
         )
 
-        # --- 操作按鈕區 ---
+        # --- 操作按鈕區 (修正縮排錯誤) ---
         b1, b2 = st.columns(2)
-        
         with b1:
             if st.button("🔥 執行刪除選中項目"):
                 keep_df = edited_df[edited_df["🗑️刪除"] == False].copy()
@@ -261,11 +218,13 @@ with tab2:
                         st.success(f"✅ 已成功刪除 {len(edited_df) - len(keep_df)} 筆紀錄！")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"存檔時發生錯誤: {e}")
+                        st.error(f"存檔出錯: {e}")
                 else:
-                    st.warning("⚠️ 請先在表格左側勾選 🗑️ 欄位")
+                    st.warning("⚠️ 請勾選 🗑️ 欄位")
+        with b2:
+            st.info("💡 勾選 🖨️ 欄位後可進行列印作業 (開發中)")
     else:
-        st.warning("⚠️ 目前尚無歷史紀錄，請至新增點交單填寫。")
+        st.warning("⚠️ 目前尚無歷史紀錄。")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
