@@ -196,7 +196,6 @@ with tab2:
                 # 存入 Session 並強制重新渲染
                 st.session_state['print_content'] = final_html
                 st.success("✅ 格式已生成 (支援多筆)！請按下 Ctrl + P。")
-    else:
         st.info("尚無歷史紀錄。")
 # 請確保這段在 App 的最後一行，不要放在任何 if 或 tab 裡面
 if 'print_content' in st.session_state:
