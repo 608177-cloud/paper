@@ -4,14 +4,14 @@ from datetime import datetime
 import os
 import pytz
 
-# --- 0. 時區設定 ---
+# --- 0. 時區與初始化設定 ---
 tw_tz = pytz.timezone('Asia/Taipei')
 now_tw = datetime.now(tw_tz)
 
 # --- 1. 頁面基本配置 ---
-st.set_page_config(page_title="日翊文化點交系統-完整同步版", layout="wide")
+st.set_page_config(page_title="日翊文化點交系統-完整版", layout="wide")
 
-# --- 2. 強化列印與介面樣式 ---
+# --- 2. 介面樣式設計 ---
 st.markdown("""
     <style>
     .report-title { font-size: 28px; font-weight: bold; text-align: center; color: #1E3A8A; margin-bottom: 20px; }
@@ -26,13 +26,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 資料處理邏輯 ---
+# --- 3. 資料存取邏輯 (修復 ValueError 與路徑問題) ---
 DB_FILE = "delivery_data.csv"
 
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            return pd.read_csv(DB_FILE)
+            df = pd.read_csv(DB_FILE)
+            # 確保日期欄位格式統一
+            df['日期'] = df['日期'].astype(str)
+            return df
         except:
             return pd.DataFrame()
     return pd.DataFrame()
@@ -40,24 +43,27 @@ def load_data():
 def save_data(data):
     if isinstance(data, dict):
         df_existing = load_data()
-        # 修正 ValueError: 使用 [data] 確保為 2D 結構
+        # 強制將字典轉換為包含單一列的 DataFrame 以符合 2D 要求
         new_row = pd.DataFrame([data])
-        df_to_save = pd.concat([df_existing, new_row], ignore_index=True)
+        if not df_existing.empty:
+            df_to_save = pd.concat([df_existing, new_row], ignore_index=True)
+        else:
+            df_to_save = new_row
     else:
-        # 如果傳入的是過濾後的 DataFrame
         df_to_save = data
     
-    # 移除 UI 專用臨時欄位再存檔
+    # 存檔前清除 UI 專用臨時標記欄位
     cols_to_drop = ["🗑️刪除", "🖨️列印", "日期篩選"]
     df_to_save = df_to_save.drop(columns=[c for c in cols_to_drop if c in df_to_save.columns], errors='ignore')
     df_to_save.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
 
-st.markdown("<div class='report-title'>🚚 日翊文化轉運車點交表 (多人同步完整版)</div>", unsafe_allow_html=True)
+# --- 4. 主程式頁面 ---
+st.markdown("<div class='report-title'>🚚 日翊文化轉運車點交表 (系統完整版)</div>", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["📝 新增點交單", "📊 歷史紀錄與管理"])
 
 with tab1:
-    with st.form("delivery_form", clear_on_submit=True):
+    with st.form("main_form", clear_on_submit=True):
         st.markdown("<div class='section-head'>一、基本配送資料</div>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -73,20 +79,20 @@ with tab1:
             in_time = st.time_input("進廠時間", now_tw.time())
             out_time = st.time_input("出車時間", now_tw.time())
 
-        st.markdown("<div class='section-head'>二、倉別核心與週轉設備</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-head'>二、核心項目與週轉設備</div>", unsafe_allow_html=True)
         cx1, cx2, cx3, cx4 = st.columns(4)
         with cx1:
-            dx_info = st.text_input("大溪倉項目/數量", "無:0")
-            ok_info = st.text_input("岡山倉項目/數量", "無:0")
+            dx_info = st.text_input("大溪倉項目 (例: 無:0)", "無:0")
+            ok_info = st.text_input("岡山倉項目 (例: 無:0)", "無:0")
         with cx2:
-            red_box = st.number_input("紅箱", 0)
-            money_bag = st.number_input("營收袋", 0)
+            red_box = st.number_input("紅箱 (板)", 0)
+            money_bag = st.number_input("營收袋 (箱)", 0)
         with cx3:
-            pallet_val = st.number_input("棧板", 0)
-            basket_val = st.number_input("空籃", 0)
+            pallet_val = st.number_input("棧板 (落)", 0)
+            basket_val = st.number_input("空籃 (板)", 0)
         with cx4:
-            cage_wp = st.number_input("龍車防水罩", 0)
-            blue_wp = st.number_input("藍白防水罩", 0)
+            cage_wp = st.number_input("龍車防水罩 (台)", 0)
+            blue_wp = st.number_input("藍白防水罩 (台)", 0)
 
         if st.form_submit_button("✅ 儲存此趟點交資料"):
             new_entry = {
@@ -97,30 +103,30 @@ with tab1:
                 "棧板": pallet_val, "空籃": basket_val, "龍罩": cage_wp, "藍罩": blue_wp
             }
             save_data(new_entry)
-            st.success("資料已成功存檔！")
+            st.success("資料儲存成功！")
             st.rerun()
 
 with tab2:
-    st.markdown("### 📊 歷史紀錄與管理")
+    st.markdown("### 📊 歷史點交數據")
     df = load_data()
     
     if not df.empty:
-        # 日期篩選功能
+        # 日期篩選器
         df['日期篩選'] = pd.to_datetime(df['日期']).dt.date
-        filter_date = st.date_input("📅 選擇篩選日期", value=None)
+        selected_date = st.date_input("📅 按日期過濾數據", value=None)
         
         display_df = df.copy()
-        if filter_date:
-            display_df = display_df[display_df['日期篩選'] == filter_date]
+        if selected_date:
+            display_df = display_df[display_df['日期篩選'] == selected_date]
         
         # 下載 Excel 功能
         import io
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             display_df.drop(columns=['日期篩選'], errors='ignore').to_excel(writer, index=False)
-        st.download_button(label="📥 下載 Excel", data=buffer.getvalue(), file_name="日翊點交紀錄.xlsx")
+        st.download_button(label="📥 下載 Excel 報表", data=buffer.getvalue(), file_name=f"日翊點交表_{now_tw.strftime('%Y%m%d')}.xlsx")
 
-        # 資料編輯與刪除區
+        # 資料表格管理區 (修復 IndentationError)
         display_df = display_df.drop(columns=['日期篩選'], errors='ignore')
         display_df.insert(0, "🗑️刪除", False)
         
@@ -131,24 +137,20 @@ with tab2:
             column_config={"🗑️刪除": st.column_config.CheckboxColumn("🗑️", default=False)}
         )
 
-        # 修正 IndentationError: 確保按鈕在 if not df.empty 區塊內
-        col_btn1, col_btn2 = st.columns([1, 4])
-        with col_btn1:
-            if st.button("🔥 執行刪除選中項目"):
-                # 找出未被勾選刪除的資料
+        # 功能按鈕區
+        col_btn, _ = st.columns([1, 4])
+        with col_btn:
+            if st.button("🔥 確定執行刪除"):
+                # 找出未被勾選刪除的行
                 remaining_df = edited_df[edited_df["🗑️刪除"] == False].copy()
                 if len(remaining_df) < len(edited_df):
                     save_data(remaining_df)
-                    st.success("✅ 已更新資料庫！")
+                    st.success("✅ 選中紀錄已刪除！")
                     st.rerun()
                 else:
-                    st.warning("請先勾選 🗑️ 欄位")
-        
-        with col_btn2:
-            st.caption("提示：勾選後點擊左側按鈕即可刪除紀錄。")
-            
+                    st.warning("請先勾選 🗑️ 欄位再執行。")
     else:
-        st.warning("⚠️ 目前尚無歷史紀錄。")
+        st.warning("⚠️ 目前資料庫內沒有紀錄。")
         
        # 生成列印內容
         selected_data = edited_df[edited_df["🖨️列印"] == True]
