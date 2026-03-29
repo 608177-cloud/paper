@@ -186,7 +186,6 @@ with tab1:
             st.rerun()
 
 with tab2:
-    st.markdown("### 📊 歷史紀錄與管理")
     df = load_data()
     
     if not df.empty:
@@ -242,7 +241,7 @@ with tab2:
         b1, b2 = st.columns(2)
         
         with b1:
-            if st.button("🔥 確定執行刪除"):
+        if st.button("🔥 確定執行刪除"):
                 try:
                     to_delete = edited_df[edited_df["🗑️刪除"] == True]
                     
@@ -266,7 +265,7 @@ with tab2:
                     st.error(f"執行失敗：{e}")
                     
         with b2:
-            if st.button("🖨️ 準備列印 (Ctrl+P)"):
+        if st.button("🖨️ 準備列印 (Ctrl+P)"):
                 st.info("格式已生成，可直接列印")
     else:
         st.info("目前無歷史紀錄。")
